@@ -1,0 +1,79 @@
+from pydantic import BaseModel, Field
+from typing import Optional
+
+
+class AutoModeResponse(BaseModel):
+    """Response from Auto Mode."""
+
+    answer: str = Field(..., description="Generated response in user's style")
+    confidence_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Confidence score (0.0-1.0)"
+    )
+    detected_intent: Optional[str] = Field(
+        default=None, description="Detected intent of incoming message"
+    )
+    suggested_alternatives: list[str] = Field(
+        default_factory=list, description="Alternative response suggestions"
+    )
+
+
+class ResponseVariation(BaseModel):
+    """A single response variation for Assist Mode."""
+
+    style: str = Field(..., description="Style of this variation")
+    message: str = Field(..., description="The generated message")
+    tone_description: str = Field(
+        ..., description="Brief description of the tone used"
+    )
+    risk_level: str = Field(
+        default="low", description="Risk assessment: low/medium/high"
+    )
+
+
+class AssistModeResponse(BaseModel):
+    """Response from Assist Mode with multiple variations."""
+
+    situation_analysis: str = Field(
+        ..., description="Brief analysis of the situation"
+    )
+    recommended_approach: str = Field(
+        ..., description="Recommended communication approach"
+    )
+    variations: list[ResponseVariation] = Field(
+        ..., description="Generated message variations"
+    )
+    tips: list[str] = Field(
+        default_factory=list, description="Communication tips for this situation"
+    )
+
+
+class GroupMessage(BaseModel):
+    """Generated message for a specific group."""
+
+    group_id: str = Field(..., description="Target group ID")
+    group_name: str = Field(..., description="Target group name")
+    message: str = Field(..., description="Tailored message for this group")
+    tone_used: str = Field(..., description="Tone applied to this message")
+
+
+class AlibiMessageResponse(BaseModel):
+    """Response from Alibi Mode for 1:N announcements."""
+
+    original_announcement: str = Field(..., description="Original announcement text")
+    group_messages: list[GroupMessage] = Field(
+        ..., description="Tailored messages for each group"
+    )
+    delivery_order_suggestion: list[str] = Field(
+        default_factory=list, description="Suggested order of message delivery"
+    )
+
+
+class AlibiImageResponse(BaseModel):
+    """Response from Alibi Image generation."""
+
+    image_url: str = Field(..., description="URL of the generated image")
+    prompt_used: str = Field(..., description="The prompt sent to DALL-E")
+    situation: str = Field(..., description="The depicted situation")
+    usage_tips: list[str] = Field(
+        default_factory=list, description="Tips for using the image convincingly"
+    )

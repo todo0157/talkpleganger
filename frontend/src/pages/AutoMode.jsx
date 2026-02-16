@@ -1,0 +1,200 @@
+import { useState, useEffect } from 'react'
+import { autoAPI, personaAPI } from '../api'
+
+function AutoMode() {
+  const [personas, setPersonas] = useState([])
+  const [selectedPersona, setSelectedPersona] = useState('')
+  const [senderName, setSenderName] = useState('')
+  const [message, setMessage] = useState('')
+  const [response, setResponse] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    loadPersonas()
+  }, [])
+
+  const loadPersonas = async () => {
+    try {
+      const res = await personaAPI.list()
+      setPersonas(res.data)
+      if (res.data.length > 0) {
+        setSelectedPersona(res.data[0].user_id)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setResponse(null)
+
+    if (!selectedPersona) {
+      setError('페르소나를 먼저 선택해주세요')
+      return
+    }
+
+    try {
+      setLoading(true)
+      const res = await autoAPI.respond({
+        user_id: selectedPersona,
+        incoming_message: {
+          sender_id: `sender_${senderName}`,
+          sender_name: senderName,
+          message_text: message,
+        },
+      })
+      setResponse(res.data)
+    } catch (err) {
+      setError(err.response?.data?.detail || '응답 생성에 실패했습니다')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+    alert('클립보드에 복사되었습니다!')
+  }
+
+  const getConfidenceClass = (score) => {
+    if (score >= 0.8) return 'confidence-high'
+    if (score >= 0.5) return 'confidence-medium'
+    return 'confidence-low'
+  }
+
+  return (
+    <div className="page">
+      <h1 className="page-title">🤖 Auto Mode</h1>
+      <p className="page-subtitle">내 말투 그대로 자동 답장을 생성해요</p>
+
+      {personas.length === 0 ? (
+        <div className="card">
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+            먼저 <a href="/persona" style={{ color: 'var(--primary)' }}>페르소나를 등록</a>해주세요
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="card">
+            <h3 className="card-title">💬 메시지 입력</h3>
+
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label className="form-label">사용할 페르소나</label>
+                <select
+                  className="form-select"
+                  value={selectedPersona}
+                  onChange={(e) => setSelectedPersona(e.target.value)}
+                >
+                  {personas.map((p) => (
+                    <option key={p.user_id} value={p.user_id}>
+                      {p.name} ({p.user_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">보낸 사람 이름</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="예: 김철수"
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">받은 메시지</label>
+                <textarea
+                  className="form-textarea"
+                  placeholder="상대방이 보낸 메시지를 입력하세요..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  required
+                />
+              </div>
+
+              {error && (
+                <p style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</p>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+              >
+                {loading ? '생성 중...' : '답장 생성하기'}
+              </button>
+            </form>
+          </div>
+
+          {loading && (
+            <div className="card">
+              <div className="loading">
+                <div className="spinner"></div>
+                <span>AI가 답장을 생성하고 있어요...</span>
+              </div>
+            </div>
+          )}
+
+          {response && (
+            <div className="card">
+              <h3 className="card-title">✅ 생성된 답장</h3>
+
+              <div className="response-box">
+                <div className="response-header">
+                  <span className="response-label">추천 답장</span>
+                  <span className={`confidence-badge ${getConfidenceClass(response.confidence_score)}`}>
+                    신뢰도: {Math.round(response.confidence_score * 100)}%
+                  </span>
+                </div>
+                <div className="response-text">{response.answer}</div>
+                <button
+                  className="btn btn-secondary copy-btn"
+                  onClick={() => copyToClipboard(response.answer)}
+                >
+                  📋 복사하기
+                </button>
+              </div>
+
+              {response.detected_intent && (
+                <div style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>
+                  <strong>감지된 의도:</strong> {response.detected_intent}
+                </div>
+              )}
+
+              {response.suggested_alternatives?.length > 0 && (
+                <div style={{ marginTop: '1.5rem' }}>
+                  <h4 style={{ marginBottom: '0.75rem', color: 'var(--text-muted)' }}>
+                    대안 답장
+                  </h4>
+                  {response.suggested_alternatives.map((alt, i) => (
+                    <div key={i} className="response-box" style={{ marginTop: '0.5rem' }}>
+                      <div className="response-text" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        {alt}
+                      </div>
+                      <button
+                        className="btn btn-secondary copy-btn"
+                        onClick={() => copyToClipboard(alt)}
+                      >
+                        📋 복사
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+export default AutoMode
