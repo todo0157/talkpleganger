@@ -3,6 +3,18 @@ from typing import Optional
 from enum import Enum
 
 
+class PersonaCategory(str, Enum):
+    """Categories for persona organization."""
+
+    WORK = "work"           # 회사/업무용
+    FRIEND = "friend"       # 친구용
+    FAMILY = "family"       # 가족용
+    PARTNER = "partner"     # 연인용
+    FORMAL = "formal"       # 격식체/공식
+    CASUAL = "casual"       # 일상/캐주얼
+    OTHER = "other"         # 기타
+
+
 class ChatExample(BaseModel):
     """A single chat message example for persona learning."""
 
@@ -17,6 +29,17 @@ class PersonaProfile(BaseModel):
 
     user_id: str = Field(..., description="Unique user identifier")
     name: str = Field(..., description="User's display name")
+
+    # Category for quick switching
+    category: PersonaCategory = Field(
+        default=PersonaCategory.OTHER, description="Persona category for organization"
+    )
+    description: Optional[str] = Field(
+        default=None, description="Brief description of this persona"
+    )
+    icon: Optional[str] = Field(
+        default=None, description="Emoji icon for this persona"
+    )
 
     # Linguistic features
     sentence_length: str = Field(
@@ -54,6 +77,10 @@ class PersonaCreate(BaseModel):
     chat_examples: list[ChatExample] = Field(
         ..., min_length=3, description="At least 3 chat examples required"
     )
+    # Category and description
+    category: Optional[PersonaCategory] = PersonaCategory.OTHER
+    description: Optional[str] = None
+    icon: Optional[str] = None
     # Optional manual overrides
     sentence_length: Optional[str] = None
     honorific_level: Optional[str] = None
@@ -66,6 +93,9 @@ class PersonaUpdate(BaseModel):
     """Request model for updating an existing persona."""
 
     name: Optional[str] = None
+    category: Optional[PersonaCategory] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
     chat_examples: Optional[list[ChatExample]] = None
     sentence_length: Optional[str] = None
     honorific_level: Optional[str] = None

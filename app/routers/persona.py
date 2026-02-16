@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from typing import Optional
 from pydantic import BaseModel
 
-from ..schemas.persona import PersonaProfile, PersonaCreate, PersonaUpdate, ChatExample
+from ..schemas.persona import PersonaProfile, PersonaCreate, PersonaUpdate, ChatExample, PersonaCategory
 from ..services.persona_engine import PersonaEngine
 from ..services.kakao_parser import KakaoParser
 
@@ -119,6 +119,9 @@ async def create_persona_from_kakao(
     name: str = Form(...),
     my_name: str = Form(default="나"),
     max_examples: int = Form(default=50),
+    category: str = Form(default="other"),
+    description: Optional[str] = Form(default=None),
+    icon: Optional[str] = Form(default=None),
 ):
     """Create a persona directly from a KakaoTalk exported chat file."""
     if not file.filename.endswith('.txt'):
@@ -163,9 +166,18 @@ async def create_persona_from_kakao(
                 detail=f"Persona for user {user_id} already exists.",
             )
 
+        # Parse category
+        try:
+            persona_category = PersonaCategory(category)
+        except ValueError:
+            persona_category = PersonaCategory.OTHER
+
         persona_data = PersonaCreate(
             user_id=user_id,
             name=name,
+            category=persona_category,
+            description=description,
+            icon=icon,
             chat_examples=examples,
         )
 

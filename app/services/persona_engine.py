@@ -10,7 +10,7 @@ from typing import Optional
 from openai import AsyncOpenAI
 
 from ..config import get_settings
-from ..schemas.persona import PersonaProfile, PersonaCreate, ChatExample
+from ..schemas.persona import PersonaProfile, PersonaCreate, ChatExample, PersonaCategory
 from ..prompts import SystemPromptGenerator
 from ..storage import get_database
 
@@ -75,6 +75,9 @@ class PersonaEngine:
         persona = PersonaProfile(
             user_id=persona_data.user_id,
             name=persona_data.name,
+            category=persona_data.category or PersonaCategory.OTHER,
+            description=persona_data.description,
+            icon=persona_data.icon,
             sentence_length=persona_data.sentence_length or analysis.get("sentence_length", "medium"),
             honorific_level=persona_data.honorific_level or analysis.get("honorific_level", "casual"),
             emoji_usage=persona_data.emoji_usage or analysis.get("emoji_usage", "moderate"),

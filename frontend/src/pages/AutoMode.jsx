@@ -1,9 +1,22 @@
 import { useState, useEffect } from 'react'
 import { autoAPI, personaAPI } from '../api'
 
+// 카테고리 정의
+const CATEGORIES = {
+  all: { label: '전체', icon: '📋', color: '#fff' },
+  work: { label: '회사', icon: '💼', color: '#3b82f6' },
+  friend: { label: '친구', icon: '👋', color: '#22c55e' },
+  family: { label: '가족', icon: '🏠', color: '#f97316' },
+  partner: { label: '연인', icon: '💕', color: '#ec4899' },
+  formal: { label: '격식', icon: '🎩', color: '#6366f1' },
+  casual: { label: '캐주얼', icon: '😎', color: '#14b8a6' },
+  other: { label: '기타', icon: '📝', color: '#64748b' },
+}
+
 function AutoMode() {
   const [personas, setPersonas] = useState([])
   const [selectedPersona, setSelectedPersona] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [senderName, setSenderName] = useState('')
   const [message, setMessage] = useState('')
   const [response, setResponse] = useState(null)
@@ -126,24 +139,85 @@ function AutoMode() {
         </div>
       ) : (
         <>
+          {/* Quick Persona Switching */}
+          <div className="card">
+            <h3 className="card-title">🎭 페르소나 선택</h3>
+
+            {/* Category Filter */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              {Object.entries(CATEGORIES).map(([key, { label, icon, color }]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedCategory(key)}
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '16px',
+                    border: selectedCategory === key ? `2px solid ${color}` : '2px solid transparent',
+                    background: selectedCategory === key ? `${color}20` : 'rgba(255,255,255,0.1)',
+                    color: selectedCategory === key ? color : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {icon} {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Persona Cards */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {personas
+                .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
+                .map((p) => {
+                  const cat = CATEGORIES[p.category] || CATEGORIES.other
+                  const isSelected = selectedPersona === p.user_id
+                  return (
+                    <button
+                      key={p.user_id}
+                      type="button"
+                      onClick={() => setSelectedPersona(p.user_id)}
+                      style={{
+                        padding: '0.75rem 1rem',
+                        borderRadius: '12px',
+                        border: isSelected ? `2px solid ${cat.color}` : '2px solid transparent',
+                        background: isSelected ? `${cat.color}25` : 'rgba(0,0,0,0.2)',
+                        color: 'var(--text-light)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        transition: 'all 0.2s',
+                        minWidth: '120px',
+                      }}
+                    >
+                      <span style={{ fontSize: '1.25rem' }}>{p.icon || cat.icon}</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{p.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {cat.label}
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span style={{ marginLeft: 'auto', color: cat.color }}>✓</span>
+                      )}
+                    </button>
+                  )
+                })}
+            </div>
+
+            {personas.filter(p => selectedCategory === 'all' || p.category === selectedCategory).length === 0 && (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>
+                이 카테고리에 페르소나가 없습니다
+              </p>
+            )}
+          </div>
+
           <div className="card">
             <h3 className="card-title">💬 메시지 입력</h3>
 
             <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label className="form-label">사용할 페르소나</label>
-                <select
-                  className="form-select"
-                  value={selectedPersona}
-                  onChange={(e) => setSelectedPersona(e.target.value)}
-                >
-                  {personas.map((p) => (
-                    <option key={p.user_id} value={p.user_id}>
-                      {p.name} ({p.user_id})
-                    </option>
-                  ))}
-                </select>
-              </div>
 
               <div className="form-group">
                 <label className="form-label">보낸 사람 이름</label>

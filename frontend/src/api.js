@@ -29,13 +29,16 @@ export const personaAPI = {
   },
 
   // Create persona directly from KakaoTalk file
-  createFromKakao: (file, userId, name, myName = '나', maxExamples = 50) => {
+  createFromKakao: (file, userId, name, myName = '나', maxExamples = 50, category = 'other', description = '', icon = '') => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('user_id', userId)
     formData.append('name', name)
     formData.append('my_name', myName)
     formData.append('max_examples', maxExamples)
+    formData.append('category', category)
+    if (description) formData.append('description', description)
+    if (icon) formData.append('icon', icon)
     return axios.post(`${API_BASE}/persona/create-from-kakao`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })

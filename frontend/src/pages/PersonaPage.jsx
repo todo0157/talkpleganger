@@ -1,6 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { personaAPI } from '../api'
 
+// 카테고리 정의
+const CATEGORIES = {
+  work: { label: '회사/업무', icon: '💼', color: '#3b82f6' },
+  friend: { label: '친구', icon: '👋', color: '#22c55e' },
+  family: { label: '가족', icon: '🏠', color: '#f97316' },
+  partner: { label: '연인', icon: '💕', color: '#ec4899' },
+  formal: { label: '격식체', icon: '🎩', color: '#6366f1' },
+  casual: { label: '캐주얼', icon: '😎', color: '#14b8a6' },
+  other: { label: '기타', icon: '📝', color: '#64748b' },
+}
+
 function PersonaPage() {
   const [personas, setPersonas] = useState([])
   const [loading, setLoading] = useState(false)
@@ -13,6 +24,9 @@ function PersonaPage() {
   const [formData, setFormData] = useState({
     user_id: '',
     name: '',
+    category: 'other',
+    description: '',
+    icon: '',
     chat_examples: [
       { role: 'other', content: '' },
       { role: 'user', content: '' },
@@ -25,6 +39,9 @@ function PersonaPage() {
   const [fileData, setFileData] = useState({
     user_id: '',
     name: '',
+    category: 'other',
+    description: '',
+    icon: '',
     my_name: '나',
     target_person: '', // For group chat: specific person to focus on
     file: null,
@@ -71,6 +88,9 @@ function PersonaPage() {
       setFormData({
         user_id: '',
         name: '',
+        category: 'other',
+        description: '',
+        icon: '',
         chat_examples: [
           { role: 'other', content: '' },
           { role: 'user', content: '' },
@@ -122,10 +142,14 @@ function PersonaPage() {
         fileData.file,
         fileData.user_id,
         fileData.name,
-        fileData.my_name
+        fileData.my_name,
+        50,
+        fileData.category,
+        fileData.description,
+        fileData.icon
       )
       await loadPersonas()
-      setFileData({ user_id: '', name: '', my_name: '나', target_person: '', file: null })
+      setFileData({ user_id: '', name: '', category: 'other', description: '', icon: '', my_name: '나', target_person: '', file: null })
       setParsedPreview(null)
       setIsGroupChat(false)
       setParticipants({})
@@ -227,6 +251,43 @@ function PersonaPage() {
                   required
                 />
               </div>
+            </div>
+
+            {/* Category Selection */}
+            <div className="form-group">
+              <label className="form-label">카테고리</label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {Object.entries(CATEGORIES).map(([key, { label, icon, color }]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFileData({ ...fileData, category: key, icon: icon })}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '20px',
+                      border: fileData.category === key ? `2px solid ${color}` : '2px solid transparent',
+                      background: fileData.category === key ? `${color}30` : 'rgba(255,255,255,0.1)',
+                      color: fileData.category === key ? color : 'var(--text-light)',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">설명 (선택)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="예: 팀장님과 대화할 때 사용하는 말투"
+                value={fileData.description}
+                onChange={(e) => setFileData({ ...fileData, description: e.target.value })}
+              />
             </div>
 
             <div className="form-group">
@@ -393,6 +454,43 @@ function PersonaPage() {
               </div>
             </div>
 
+            {/* Category Selection for Manual Mode */}
+            <div className="form-group">
+              <label className="form-label">카테고리</label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {Object.entries(CATEGORIES).map(([key, { label, icon, color }]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, category: key, icon: icon })}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '20px',
+                      border: formData.category === key ? `2px solid ${color}` : '2px solid transparent',
+                      background: formData.category === key ? `${color}30` : 'rgba(255,255,255,0.1)',
+                      color: formData.category === key ? color : 'var(--text-light)',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">설명 (선택)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="예: 회사 동료와 대화할 때 사용하는 말투"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+
             <div className="form-group">
               <label className="form-label">대화 예시 (최소 3개)</label>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
@@ -467,39 +565,63 @@ function PersonaPage() {
           </p>
         ) : (
           <div style={{ display: 'grid', gap: '1rem' }}>
-            {personas.map((persona) => (
-              <div
-                key={persona.user_id}
-                style={{
-                  background: 'rgba(0,0,0,0.2)',
-                  borderRadius: '12px',
-                  padding: '1rem',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <h4 style={{ marginBottom: '0.5rem' }}>
-                      {persona.name}
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: '0.5rem' }}>
-                        ({persona.user_id})
-                      </span>
-                    </h4>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span className="confidence-badge confidence-high">톤: {persona.tone}</span>
-                      <span className="confidence-badge confidence-medium">높임말: {persona.honorific_level}</span>
-                      <span className="confidence-badge confidence-low">이모지: {persona.emoji_usage}</span>
+            {personas.map((persona) => {
+              const category = CATEGORIES[persona.category] || CATEGORIES.other
+              return (
+                <div
+                  key={persona.user_id}
+                  style={{
+                    background: 'rgba(0,0,0,0.2)',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    borderLeft: `4px solid ${category.color}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '1.5rem' }}>{persona.icon || category.icon}</span>
+                        <h4 style={{ margin: 0 }}>
+                          {persona.name}
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: '0.5rem' }}>
+                            ({persona.user_id})
+                          </span>
+                        </h4>
+                      </div>
+                      {persona.description && (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0.5rem' }}>
+                          {persona.description}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            background: `${category.color}30`,
+                            color: category.color,
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '12px',
+                            fontSize: '0.8rem',
+                            fontWeight: '500',
+                          }}
+                        >
+                          {category.icon} {category.label}
+                        </span>
+                        <span className="confidence-badge confidence-high">톤: {persona.tone}</span>
+                        <span className="confidence-badge confidence-medium">높임말: {persona.honorific_level}</span>
+                        <span className="confidence-badge confidence-low">이모지: {persona.emoji_usage}</span>
+                      </div>
                     </div>
+                    <button
+                      className="btn btn-danger"
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                      onClick={() => handleDelete(persona.user_id)}
+                    >
+                      삭제
+                    </button>
                   </div>
-                  <button
-                    className="btn btn-danger"
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
-                    onClick={() => handleDelete(persona.user_id)}
-                  >
-                    삭제
-                  </button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

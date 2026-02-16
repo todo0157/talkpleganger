@@ -48,6 +48,9 @@ class DatabaseStore:
                 CREATE TABLE IF NOT EXISTS personas (
                     user_id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
+                    category TEXT DEFAULT 'other',
+                    description TEXT,
+                    icon TEXT,
                     tone TEXT,
                     honorific_level TEXT,
                     emoji_usage TEXT,
@@ -59,6 +62,20 @@ class DatabaseStore:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Add new columns if they don't exist (for migration)
+            try:
+                cursor.execute("ALTER TABLE personas ADD COLUMN category TEXT DEFAULT 'other'")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                cursor.execute("ALTER TABLE personas ADD COLUMN description TEXT")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                cursor.execute("ALTER TABLE personas ADD COLUMN icon TEXT")
+            except sqlite3.OperationalError:
+                pass
 
             # Chat history table
             cursor.execute("""
@@ -113,15 +130,20 @@ class DatabaseStore:
                 persona.special_expressions or [],
                 ensure_ascii=False
             )
+            category_value = persona.category.value if hasattr(persona.category, 'value') else persona.category
 
             cursor.execute("""
                 INSERT INTO personas (
-                    user_id, name, tone, honorific_level, emoji_usage,
+                    user_id, name, category, description, icon,
+                    tone, honorific_level, emoji_usage,
                     sentence_length, special_expressions, chat_examples,
                     system_prompt, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
                     name = excluded.name,
+                    category = excluded.category,
+                    description = excluded.description,
+                    icon = excluded.icon,
                     tone = excluded.tone,
                     honorific_level = excluded.honorific_level,
                     emoji_usage = excluded.emoji_usage,
@@ -133,6 +155,9 @@ class DatabaseStore:
             """, (
                 persona.user_id,
                 persona.name,
+                category_value,
+                persona.description,
+                persona.icon,
                 persona.tone,
                 persona.honorific_level,
                 persona.emoji_usage,
@@ -166,6 +191,8 @@ class DatabaseStore:
 
     def _row_to_persona(self, row: sqlite3.Row) -> PersonaProfile:
         """Convert database row to PersonaProfile."""
+        from ..schemas.persona import PersonaCategory
+
         chat_examples_data = json.loads(row["chat_examples"] or "[]")
         chat_examples = [
             ChatExample(role=ex["role"], content=ex["content"])
@@ -173,9 +200,19 @@ class DatabaseStore:
         ]
         special_expressions = json.loads(row["special_expressions"] or "[]")
 
+        # Parse category
+        category_str = row["category"] or "other"
+        try:
+            category = PersonaCategory(category_str)
+        except ValueError:
+            category = PersonaCategory.OTHER
+
         return PersonaProfile(
             user_id=row["user_id"],
             name=row["name"],
+            category=category,
+            description=row["description"],
+            icon=row["icon"],
             tone=row["tone"] or "friendly",
             honorific_level=row["honorific_level"] or "casual",
             emoji_usage=row["emoji_usage"] or "moderate",
