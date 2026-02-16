@@ -174,6 +174,9 @@ OPENAI_API_KEY=sk-...
 ### PersonaProfile
 - `user_id`: 사용자 ID
 - `name`: 이름
+- `category`: 카테고리 (work/friend/family/partner/formal/casual/other)
+- `description`: 페르소나 설명
+- `icon`: 커스텀 이모지 아이콘
 - `tone`: 말투 (친근/격식/유머러스 등)
 - `honorific_level`: 높임말 수준
 - `emoji_usage`: 이모지 사용 빈도
@@ -214,3 +217,21 @@ OPENAI_API_KEY=sk-...
 2. **데이터베이스**: `talkpleganger.db` 파일 백업 권장
 3. **CORS**: localhost에서만 허용됨
 4. **한국어 인코딩**: 카톡 파일은 UTF-8, CP949, EUC-KR 자동 감지
+
+## 테스트 예시
+
+### 직장인 모드 (work)
+```
+입력: "회의 일정이 변경됐는데 괜찮으시죠?"
+응답: "네, 괜찮습니다. 변경된 일정 알려주시면 감사하겠습니다."
+신뢰도: 90% | 감정: neutral
+```
+
+### 친구 모드 (friend)
+```
+입력: "야 오늘 PC방 갈래??"
+응답: "오 좋아!! 몇 시에 갈까? ㅋㅋㅋ"
+신뢰도: 95% | 감정: excited
+```
+
+카테고리에 따라 말투가 자동으로 조절됩니다.
