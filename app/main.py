@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .routers import persona_router, auto_router, assist_router, alibi_router
+from .routers.history import router as history_router
 
 # Initialize settings
 settings = get_settings()
@@ -61,6 +62,7 @@ app.include_router(persona_router)
 app.include_router(auto_router)
 app.include_router(assist_router)
 app.include_router(alibi_router)
+app.include_router(history_router)
 
 
 @app.get("/", tags=["Health"])

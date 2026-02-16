@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     max_response_tokens: int = 500
     temperature: float = 0.7
 
+    # Database settings
+    database_path: str = "talkpleganger.db"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -10,6 +10,7 @@ from ..schemas.message import AutoModeRequest
 from ..schemas.response import AutoModeResponse
 from ..services.persona_engine import PersonaEngine
 from ..services.gpt_service import GPTService
+from ..storage import get_database
 
 router = APIRouter(prefix="/auto", tags=["Auto Mode"])
 
@@ -49,6 +50,25 @@ async def generate_auto_response(request: AutoModeRequest):
         incoming_message=request.incoming_message,
         context_messages=request.context_messages,
         response_length=request.response_length,
+    )
+
+    # Save to chat history
+    db = get_database()
+    emotion = None
+    emotion_intensity = None
+    if response.emotion_analysis:
+        emotion = response.emotion_analysis.primary_emotion.value
+        emotion_intensity = response.emotion_analysis.emotion_intensity
+
+    db.add_chat_message(
+        user_id=request.user_id,
+        sender_name=request.incoming_message.sender_name,
+        sender_id=request.incoming_message.sender_id,
+        message_text=request.incoming_message.message_text,
+        response_text=response.answer,
+        emotion=emotion,
+        emotion_intensity=emotion_intensity,
+        confidence_score=response.confidence_score,
     )
 
     return response

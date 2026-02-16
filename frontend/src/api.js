@@ -65,4 +65,13 @@ export const alibiAPI = {
   },
 }
 
+// Chat History API
+export const historyAPI = {
+  get: (userId, limit = 20, offset = 0) =>
+    api.get(`/history/${userId}?limit=${limit}&offset=${offset}`),
+  getStats: (userId) => api.get(`/history/${userId}/stats`),
+  clear: (userId) => api.delete(`/history/${userId}`),
+  deleteMessage: (messageId) => api.delete(`/history/message/${messageId}`),
+}
+
 export default api

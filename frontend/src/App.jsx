@@ -4,6 +4,7 @@ import PersonaPage from './pages/PersonaPage'
 import AutoMode from './pages/AutoMode'
 import AssistMode from './pages/AssistMode'
 import AlibiMode from './pages/AlibiMode'
+import HistoryPage from './pages/HistoryPage'
 import './App.css'
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
             <NavLink to="/auto">Auto</NavLink>
             <NavLink to="/assist">Assist</NavLink>
             <NavLink to="/alibi">Alibi</NavLink>
+            <NavLink to="/history">히스토리</NavLink>
           </div>
         </nav>
 
@@ -31,6 +33,7 @@ function App() {
             <Route path="/auto" element={<AutoMode />} />
             <Route path="/assist" element={<AssistMode />} />
             <Route path="/alibi" element={<AlibiMode />} />
+            <Route path="/history" element={<HistoryPage />} />
           </Routes>
         </main>
 
@@ -48,9 +51,9 @@ function App() {
             <span>🤖</span>
             <span>Auto</span>
           </NavLink>
-          <NavLink to="/assist">
-            <span>💡</span>
-            <span>Assist</span>
+          <NavLink to="/history">
+            <span>📜</span>
+            <span>히스토리</span>
           </NavLink>
           <NavLink to="/alibi">
             <span>📢</span>

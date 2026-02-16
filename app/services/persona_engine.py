@@ -12,7 +12,7 @@ from openai import AsyncOpenAI
 from ..config import get_settings
 from ..schemas.persona import PersonaProfile, PersonaCreate, ChatExample
 from ..prompts import SystemPromptGenerator
-from ..storage import get_store
+from ..storage import get_database
 
 
 class PersonaEngine:
@@ -22,7 +22,7 @@ class PersonaEngine:
         settings = get_settings()
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = settings.openai_model
-        self.store = get_store()
+        self.store = get_database()
 
     async def analyze_persona(
         self, chat_examples: list[ChatExample]
