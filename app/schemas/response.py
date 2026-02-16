@@ -1,5 +1,40 @@
 from pydantic import BaseModel, Field
 from typing import Optional
+from enum import Enum
+
+
+class EmotionType(str, Enum):
+    """Detected emotion types."""
+    HAPPY = "happy"
+    SAD = "sad"
+    ANGRY = "angry"
+    ANXIOUS = "anxious"
+    EXCITED = "excited"
+    NEUTRAL = "neutral"
+    CONFUSED = "confused"
+    GRATEFUL = "grateful"
+    APOLOGETIC = "apologetic"
+    URGENT = "urgent"
+
+
+class EmotionAnalysis(BaseModel):
+    """Emotion analysis result."""
+
+    primary_emotion: EmotionType = Field(
+        ..., description="Primary detected emotion"
+    )
+    emotion_intensity: float = Field(
+        ..., ge=0.0, le=1.0, description="Emotion intensity (0.0-1.0)"
+    )
+    emotion_keywords: list[str] = Field(
+        default_factory=list, description="Keywords that indicate the emotion"
+    )
+    recommended_tone: str = Field(
+        ..., description="Recommended response tone based on emotion"
+    )
+    tone_adjustment: str = Field(
+        ..., description="How the response tone was adjusted"
+    )
 
 
 class AutoModeResponse(BaseModel):
@@ -14,6 +49,9 @@ class AutoModeResponse(BaseModel):
     )
     suggested_alternatives: list[str] = Field(
         default_factory=list, description="Alternative response suggestions"
+    )
+    emotion_analysis: Optional[EmotionAnalysis] = Field(
+        default=None, description="Emotion analysis of incoming message"
     )
 
 

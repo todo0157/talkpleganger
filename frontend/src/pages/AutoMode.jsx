@@ -65,6 +65,54 @@ function AutoMode() {
     return 'confidence-low'
   }
 
+  const getEmotionEmoji = (emotion) => {
+    const emojiMap = {
+      happy: '😊',
+      sad: '😢',
+      angry: '😠',
+      anxious: '😰',
+      excited: '🤩',
+      neutral: '😐',
+      confused: '😕',
+      grateful: '🙏',
+      apologetic: '😔',
+      urgent: '⚡',
+    }
+    return emojiMap[emotion] || '😐'
+  }
+
+  const getEmotionLabel = (emotion) => {
+    const labelMap = {
+      happy: '기쁨',
+      sad: '슬픔',
+      angry: '화남',
+      anxious: '불안',
+      excited: '흥분',
+      neutral: '중립',
+      confused: '혼란',
+      grateful: '감사',
+      apologetic: '미안함',
+      urgent: '긴급',
+    }
+    return labelMap[emotion] || '중립'
+  }
+
+  const getEmotionColor = (emotion) => {
+    const colorMap = {
+      happy: '#22c55e',
+      sad: '#3b82f6',
+      angry: '#ef4444',
+      anxious: '#f59e0b',
+      excited: '#ec4899',
+      neutral: '#9ca3af',
+      confused: '#8b5cf6',
+      grateful: '#14b8a6',
+      apologetic: '#6b7280',
+      urgent: '#f97316',
+    }
+    return colorMap[emotion] || '#9ca3af'
+  }
+
   return (
     <div className="page">
       <h1 className="page-title">🤖 Auto Mode</h1>
@@ -146,6 +194,60 @@ function AutoMode() {
           {response && (
             <div className="card">
               <h3 className="card-title">✅ 생성된 답장</h3>
+
+              {/* Emotion Analysis Section */}
+              {response.emotion_analysis && (
+                <div style={{
+                  background: `linear-gradient(135deg, ${getEmotionColor(response.emotion_analysis.primary_emotion)}15 0%, ${getEmotionColor(response.emotion_analysis.primary_emotion)}05 100%)`,
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  border: `1px solid ${getEmotionColor(response.emotion_analysis.primary_emotion)}30`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '2rem' }}>
+                      {getEmotionEmoji(response.emotion_analysis.primary_emotion)}
+                    </span>
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '1rem' }}>
+                        감정 분석: {getEmotionLabel(response.emotion_analysis.primary_emotion)}
+                      </div>
+                      <div style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted)',
+                        marginTop: '0.25rem'
+                      }}>
+                        강도: {Math.round(response.emotion_analysis.emotion_intensity * 100)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {response.emotion_analysis.emotion_keywords?.length > 0 && (
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                      {response.emotion_analysis.emotion_keywords.map((keyword, i) => (
+                        <span key={i} style={{
+                          background: 'rgba(255,255,255,0.1)',
+                          padding: '0.25rem 0.6rem',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                        }}>
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{
+                    fontSize: '0.85rem',
+                    color: 'var(--text-light)',
+                    background: 'rgba(0,0,0,0.2)',
+                    padding: '0.6rem 0.8rem',
+                    borderRadius: '8px',
+                  }}>
+                    <strong>톤 조절:</strong> {response.emotion_analysis.tone_adjustment}
+                  </div>
+                </div>
+              )}
 
               <div className="response-box">
                 <div className="response-header">

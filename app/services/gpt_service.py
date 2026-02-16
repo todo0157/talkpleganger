@@ -22,6 +22,8 @@ from ..schemas.response import (
     ResponseVariation,
     AlibiMessageResponse,
     GroupMessage,
+    EmotionAnalysis,
+    EmotionType,
 )
 from ..prompts import SystemPromptGenerator
 
@@ -81,11 +83,34 @@ class GPTService:
         # Parse response
         result = json.loads(response.choices[0].message.content)
 
+        # Parse emotion analysis if present
+        emotion_data = result.get("emotion_analysis")
+        emotion_analysis = None
+        if emotion_data:
+            try:
+                emotion_analysis = EmotionAnalysis(
+                    primary_emotion=EmotionType(emotion_data.get("primary_emotion", "neutral")),
+                    emotion_intensity=float(emotion_data.get("emotion_intensity", 0.5)),
+                    emotion_keywords=emotion_data.get("emotion_keywords", []),
+                    recommended_tone=emotion_data.get("recommended_tone", ""),
+                    tone_adjustment=emotion_data.get("tone_adjustment", ""),
+                )
+            except (ValueError, KeyError):
+                # Fallback if emotion parsing fails
+                emotion_analysis = EmotionAnalysis(
+                    primary_emotion=EmotionType.NEUTRAL,
+                    emotion_intensity=0.5,
+                    emotion_keywords=[],
+                    recommended_tone="평소 말투 유지",
+                    tone_adjustment="기본 톤 사용",
+                )
+
         return AutoModeResponse(
             answer=result.get("answer", ""),
             confidence_score=float(result.get("confidence_score", 0.8)),
             detected_intent=result.get("detected_intent"),
             suggested_alternatives=result.get("suggested_alternatives", []),
+            emotion_analysis=emotion_analysis,
         )
 
     # ============================================================
