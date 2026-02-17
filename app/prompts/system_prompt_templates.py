@@ -179,6 +179,139 @@ Requirements:
 
 Generate a detailed, natural-looking scene."""
 
+    # ============================================================
+    # FOLLOW-UP MODE TEMPLATE
+    # ============================================================
+    FOLLOWUP_MODE_TEMPLATE = """당신은 대화 전문가입니다. 상대방이 읽고 답장하지 않았을 때 자연스럽게 대화를 이어갈 수 있는 후속 메시지를 생성해주세요.
+
+## 사용자 프로필
+- 이름: {user_name}
+- 말투 톤: {tone}
+- 이모지 사용: {emoji_usage}
+
+## 상황
+- 마지막 보낸 메시지: {last_message}
+- 경과 시간: {hours_elapsed}시간
+- 상대와의 관계: {relationship}
+- 원래 의도: {original_intent}
+
+## 후속 메시지 전략 가이드
+| 경과 시간 | 전략 | 설명 |
+|----------|------|------|
+| 1-2시간 | gentle_reminder | 부드러운 리마인더, 추가 정보 제공 |
+| 2-4시간 | casual_check | 가벼운 안부 또는 관련 질문 |
+| 4-8시간 | conversation_starter | 새로운 화제로 자연스럽게 전환 |
+| 8-24시간 | topic_change | 완전히 다른 주제로 새 대화 시작 |
+| 24시간+ | reconnect | 시간이 지난 것을 자연스럽게 인정하며 다시 연결 |
+
+## 지시사항
+1. 사용자의 말투와 톤을 유지하면서 후속 메시지를 생성하세요.
+2. 상대방을 압박하거나 불편하게 하지 않는 자연스러운 메시지를 만드세요.
+3. 경과 시간에 따라 적절한 전략을 선택하세요.
+4. 각 제안에 대해 위험도와 사용 적절 상황을 설명하세요.
+
+## 응답 형식
+반드시 다음 JSON 형식으로 응답하세요:
+{{
+    "recommended_strategy": "전략명 (gentle_reminder/casual_check/conversation_starter/topic_change/reconnect)",
+    "strategy_explanation": "왜 이 전략이 좋은지",
+    "suggestions": [
+        {{
+            "message": "후속 메시지",
+            "strategy": "사용된 전략",
+            "tone_description": "톤 설명",
+            "risk_level": "low/medium/high",
+            "recommended_for": "이 메시지를 사용하면 좋은 상황"
+        }}
+    ],
+    "tips": ["팁1", "팁2", "팁3"],
+    "should_wait_more": true/false,
+    "recommended_additional_wait_hours": null 또는 숫자
+}}"""
+
+    # ============================================================
+    # REACTION IMAGE PROMPT TEMPLATES
+    # ============================================================
+    REACTION_IMAGE_TEMPLATES = {
+        "meme": """Create a funny meme-style reaction image expressing {emotion}.
+Style: Internet meme, bold and expressive, humorous
+Emotion keywords: {emotion_keywords}
+Context: {context}
+Requirements:
+- Highly expressive facial expression or character
+- Clean, shareable format suitable for messaging
+- No offensive content
+- Works well at small sizes for chat apps
+- Bright, eye-catching colors""",
+
+        "emoji_art": """Create a large emoji-style art illustration expressing {emotion}.
+Style: Simplified, colorful, emoji-inspired digital illustration
+Emotion: {emotion}
+Requirements:
+- Single expressive character or face filling most of the frame
+- Bright, vibrant colors with clean edges
+- Simple solid color or gradient background
+- Instantly recognizable emotion
+- Suitable for messaging apps like KakaoTalk""",
+
+        "cute_character": """Create an adorable kawaii-style character reaction image expressing {emotion}.
+Style: Kawaii, chibi, cute character illustration
+Emotion: {emotion}
+Context: {context}
+Requirements:
+- Adorable round character design with big eyes
+- Exaggerated but cute emotional expression
+- Soft, pastel colors preferred
+- Appeal to Korean messaging culture
+- Simple background that doesn't distract from character""",
+
+        "sticker": """Create a messaging app sticker design expressing {emotion}.
+Style: Clean sticker design with bold outlines, like KakaoTalk emoticons
+Emotion: {emotion}
+Requirements:
+- Simple, clear design with defined edges
+- Works well at small sizes (128x128 to 512x512)
+- Expressive without needing text
+- White or transparent-friendly background
+- Suitable for Korean messaging apps""",
+
+        "minimal": """Create a minimal line art illustration expressing {emotion}.
+Style: Minimalist line art, modern and clean
+Emotion: {emotion}
+Requirements:
+- Simple geometric shapes and clean lines
+- Limited color palette (2-3 colors maximum)
+- Modern, sophisticated aesthetic
+- Subtle but clearly recognizable emotion
+- White or simple background""",
+    }
+
+    EMOTION_KEYWORDS = {
+        "happy": ["joyful", "smiling", "cheerful", "bright", "delighted", "grinning"],
+        "sad": ["melancholy", "tearful", "downcast", "blue", "dejected", "crying"],
+        "angry": ["frustrated", "annoyed", "fierce", "intense", "fuming", "mad"],
+        "surprised": ["shocked", "amazed", "wide-eyed", "startled", "astonished"],
+        "love": ["heart-eyes", "affectionate", "adoring", "sweet", "loving", "hearts"],
+        "tired": ["exhausted", "sleepy", "drained", "yawning", "weary", "drowsy"],
+        "confused": ["puzzled", "questioning", "uncertain", "head-tilted", "perplexed"],
+        "excited": ["enthusiastic", "jumping", "energetic", "thrilled", "pumped"],
+        "grateful": ["thankful", "appreciative", "touched", "moved", "blessed"],
+        "apologetic": ["sorry", "regretful", "sheepish", "guilty", "remorseful"],
+    }
+
+    EMOTION_USAGE_SUGGESTIONS = {
+        "happy": "좋은 소식에 반응하거나 축하할 때 사용하세요",
+        "sad": "공감하거나 슬픈 상황을 표현할 때 사용하세요",
+        "angry": "짜증나는 상황에 공감을 표현할 때 사용하세요",
+        "surprised": "놀라운 소식이나 예상치 못한 상황에 사용하세요",
+        "love": "감사하거나 애정을 표현할 때 사용하세요",
+        "tired": "피곤하거나 지친 상황을 표현할 때 사용하세요",
+        "confused": "이해가 안 되거나 당황스러운 상황에 사용하세요",
+        "excited": "기대되거나 흥분되는 상황에 사용하세요",
+        "grateful": "감사를 표현하거나 고마움을 전할 때 사용하세요",
+        "apologetic": "미안함을 표현하거나 사과할 때 사용하세요",
+    }
+
     @classmethod
     def format_chat_examples(cls, examples: list[ChatExample]) -> str:
         """Format chat examples for prompt inclusion."""
@@ -277,3 +410,55 @@ Generate a detailed, natural-looking scene."""
             style=style,
             additional_details=additional_details or "None",
         )
+
+    @classmethod
+    def generate_followup_prompt(
+        cls,
+        persona: PersonaProfile,
+        last_message: str,
+        hours_elapsed: float,
+        relationship: str,
+        original_intent: Optional[str] = None,
+    ) -> str:
+        """Generate prompt for follow-up message generation."""
+        return cls.FOLLOWUP_MODE_TEMPLATE.format(
+            user_name=persona.name,
+            tone=persona.tone,
+            emoji_usage=persona.emoji_usage,
+            last_message=last_message,
+            hours_elapsed=hours_elapsed,
+            relationship=relationship,
+            original_intent=original_intent or "특별한 의도 없음",
+        )
+
+    @classmethod
+    def generate_reaction_image_prompt(
+        cls,
+        emotion: str,
+        style: str = "cute_character",
+        context: Optional[str] = None,
+    ) -> str:
+        """Generate DALL-E prompt for reaction image generation."""
+        template = cls.REACTION_IMAGE_TEMPLATES.get(
+            style, cls.REACTION_IMAGE_TEMPLATES["cute_character"]
+        )
+        emotion_keywords = ", ".join(
+            cls.EMOTION_KEYWORDS.get(emotion, ["expressive"])
+        )
+        return template.format(
+            emotion=emotion,
+            emotion_keywords=emotion_keywords,
+            context=context or "general chat reaction",
+        )
+
+    @classmethod
+    def get_emotion_usage_suggestion(cls, emotion: str) -> str:
+        """Get usage suggestion for a specific emotion."""
+        return cls.EMOTION_USAGE_SUGGESTIONS.get(
+            emotion, "다양한 상황에서 사용할 수 있습니다"
+        )
+
+    @classmethod
+    def get_emotion_keywords(cls, emotion: str) -> list[str]:
+        """Get keywords for a specific emotion."""
+        return cls.EMOTION_KEYWORDS.get(emotion, ["expressive"])

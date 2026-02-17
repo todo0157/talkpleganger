@@ -10,6 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .routers import persona_router, auto_router, assist_router, alibi_router
 from .routers.history import router as history_router
+from .routers.timing import router as timing_router
+from .routers.followup import router as followup_router
+from .routers.reaction import router as reaction_router
 
 # Initialize settings
 settings = get_settings()
@@ -27,7 +30,8 @@ app = FastAPI(
 #### 1. Auto Mode (자동 응답)
 - 사용자의 말투를 학습하여 자동으로 답장 생성
 - Few-shot 프롬프팅으로 개인화된 응답 제공
-- 신뢰도 점수와 대안 답장 포함
+- 대화 맥락 자동 기억 (Context Memory)
+- 답장 타이밍 추천 포함
 
 #### 2. Assist Mode (멘트 보조)
 - 상사, 교수 등 어려운 상대에게 보낼 메시지 제안
@@ -38,10 +42,24 @@ app = FastAPI(
 - 1:N 공지: 하나의 메시지를 그룹별 톤으로 변환
 - 알리바이 이미지: DALL-E 3로 상황 이미지 생성
 
+#### 4. Follow-up Mode (읽씹 대응)
+- 답장 없을 때 자연스러운 후속 메시지 생성
+- 경과 시간별 전략 추천
+- 관계에 맞는 톤 조절
+
+#### 5. Reaction Images (이미지 답장)
+- 감정 기반 리액션 이미지 생성
+- 다양한 스타일 (밈, 이모지, 캐릭터)
+- DALL-E 3 활용
+
+#### 6. Timing Analysis (타이밍 분석)
+- 카카오톡 대화 패턴 분석
+- 자연스러운 답장 타이밍 추천
+
 ### 기술 스택
 - Backend: FastAPI + Python
 - AI: OpenAI GPT-4o + DALL-E 3
-- Storage: In-Memory (개발용)
+- Storage: SQLite
     """,
     version="1.0.0",
     docs_url="/docs",
@@ -63,6 +81,9 @@ app.include_router(auto_router)
 app.include_router(assist_router)
 app.include_router(alibi_router)
 app.include_router(history_router)
+app.include_router(timing_router)
+app.include_router(followup_router)
+app.include_router(reaction_router)
 
 
 @app.get("/", tags=["Health"])

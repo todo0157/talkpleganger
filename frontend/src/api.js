@@ -77,4 +77,40 @@ export const historyAPI = {
   deleteMessage: (messageId) => api.delete(`/history/message/${messageId}`),
 }
 
+// Timing API
+export const timingAPI = {
+  analyze: (file, personaId, myName = '나') => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('persona_id', personaId)
+    formData.append('my_name', myName)
+    return axios.post(`${API_BASE}/timing/analyze`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  recommend: (personaId, urgency = 'medium', emotion = null) => {
+    const params = new URLSearchParams({ urgency })
+    if (emotion) params.append('emotion', emotion)
+    return api.get(`/timing/${personaId}/recommend?${params}`)
+  },
+  getPatterns: (personaId) => api.get(`/timing/${personaId}/patterns`),
+  deletePatterns: (personaId) => api.delete(`/timing/${personaId}/patterns`),
+}
+
+// Follow-up API
+export const followupAPI = {
+  suggest: (data) => api.post('/followup/suggest', data),
+  getStrategies: () => api.get('/followup/strategies'),
+  quickStrategy: (hours) => api.get(`/followup/quick/${hours}`),
+}
+
+// Reaction Image API
+export const reactionAPI = {
+  generate: (data) => api.post('/reaction/generate', data),
+  getEmotions: () => api.get('/reaction/emotions'),
+  getStyles: () => api.get('/reaction/styles'),
+  quickGenerate: (emotion, style = 'cute_character') =>
+    api.post(`/reaction/quick?emotion=${emotion}&style=${style}`),
+}
+
 export default api

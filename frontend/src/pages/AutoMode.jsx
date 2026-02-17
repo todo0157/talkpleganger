@@ -22,6 +22,11 @@ function AutoMode() {
   const [response, setResponse] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // Context Memory Settings
+  const [autoFetchContext, setAutoFetchContext] = useState(true)
+  const [contextWindowSize, setContextWindowSize] = useState(10)
+  // Timing Settings
+  const [includeTiming, setIncludeTiming] = useState(true)
 
   useEffect(() => {
     loadPersonas()
@@ -58,6 +63,9 @@ function AutoMode() {
           sender_name: senderName,
           message_text: message,
         },
+        auto_fetch_context: autoFetchContext,
+        context_window_size: contextWindowSize,
+        include_timing: includeTiming,
       })
       setResponse(res.data)
     } catch (err) {
@@ -242,6 +250,59 @@ function AutoMode() {
                 />
               </div>
 
+              {/* Context & Timing Settings */}
+              <div style={{
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: '12px',
+                padding: '1rem',
+                marginBottom: '1rem',
+              }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                  🛠️ 고급 설정
+                </div>
+
+                {/* Context Memory Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={autoFetchContext}
+                      onChange={(e) => setAutoFetchContext(e.target.checked)}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <span style={{ fontSize: '0.85rem' }}>🧠 대화 맥락 자동 기억</span>
+                  </label>
+                  {autoFetchContext && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="range"
+                        min="5"
+                        max="20"
+                        value={contextWindowSize}
+                        onChange={(e) => setContextWindowSize(parseInt(e.target.value))}
+                        style={{ width: '80px' }}
+                      />
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        최근 {contextWindowSize}개
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Timing Recommendation Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={includeTiming}
+                      onChange={(e) => setIncludeTiming(e.target.checked)}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <span style={{ fontSize: '0.85rem' }}>⏱️ 답장 타이밍 추천</span>
+                  </label>
+                </div>
+              </div>
+
               {error && (
                 <p style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</p>
               )}
@@ -338,6 +399,55 @@ function AutoMode() {
                   📋 복사하기
                 </button>
               </div>
+
+              {/* Timing Recommendation */}
+              {response.timing_recommendation && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #3b82f615 0%, #3b82f605 100%)',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  marginTop: '1rem',
+                  border: '1px solid #3b82f630',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>⏱️</span>
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '1rem' }}>
+                        답장 타이밍: {response.timing_recommendation.recommended_wait_minutes}분 후
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        자연스러운 범위: {response.timing_recommendation.natural_range}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize: '0.85rem',
+                    color: 'var(--text-light)',
+                    background: 'rgba(0,0,0,0.2)',
+                    padding: '0.6rem 0.8rem',
+                    borderRadius: '8px',
+                  }}>
+                    {response.timing_recommendation.reason}
+                  </div>
+                </div>
+              )}
+
+              {/* Context Info */}
+              {response.context_used > 0 && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginTop: '1rem',
+                  padding: '0.4rem 0.8rem',
+                  background: 'rgba(34, 197, 94, 0.15)',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  color: '#22c55e',
+                }}>
+                  🧠 최근 {response.context_used}개 대화 맥락 활용
+                </div>
+              )}
 
               {response.detected_intent && (
                 <div style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>

@@ -25,6 +25,12 @@ from ..schemas.response import (
     EmotionAnalysis,
     EmotionType,
 )
+from ..schemas.followup import (
+    FollowUpRequest,
+    FollowUpResponse,
+    FollowUpSuggestion,
+    FollowUpStrategy,
+)
 from ..prompts import SystemPromptGenerator
 
 
@@ -225,4 +231,78 @@ class GPTService:
             original_announcement=result.get("original_announcement", request.announcement),
             group_messages=group_messages,
             delivery_order_suggestion=result.get("delivery_order_suggestion", []),
+        )
+
+    # ============================================================
+    # FOLLOW-UP MODE
+    # ============================================================
+    async def generate_followup_messages(
+        self,
+        persona: PersonaProfile,
+        request: FollowUpRequest,
+    ) -> FollowUpResponse:
+        """
+        Generate follow-up messages for no-reply situations.
+
+        Suggests natural ways to continue the conversation
+        based on elapsed time and relationship.
+        """
+        # Generate system prompt
+        system_prompt = SystemPromptGenerator.generate_followup_prompt(
+            persona=persona,
+            last_message=request.last_message_text,
+            hours_elapsed=request.hours_elapsed,
+            relationship=request.recipient_relationship,
+            original_intent=request.original_intent,
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "적절한 후속 메시지를 생성해주세요."},
+        ]
+
+        # Call GPT API
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            max_tokens=self.max_tokens * 2,
+            temperature=self.temperature,
+        )
+
+        # Parse response
+        result = json.loads(response.choices[0].message.content)
+
+        # Parse suggestions
+        suggestions = []
+        for s in result.get("suggestions", []):
+            try:
+                strategy = FollowUpStrategy(s.get("strategy", "casual_check"))
+            except ValueError:
+                strategy = FollowUpStrategy.CASUAL_CHECK
+
+            suggestions.append(FollowUpSuggestion(
+                message=s.get("message", ""),
+                strategy=strategy,
+                tone_description=s.get("tone_description", ""),
+                risk_level=s.get("risk_level", "low"),
+                recommended_for=s.get("recommended_for", ""),
+            ))
+
+        # Parse recommended strategy
+        try:
+            recommended_strategy = FollowUpStrategy(
+                result.get("recommended_strategy", "casual_check")
+            )
+        except ValueError:
+            recommended_strategy = FollowUpStrategy.CASUAL_CHECK
+
+        return FollowUpResponse(
+            elapsed_hours=request.hours_elapsed,
+            recommended_strategy=recommended_strategy,
+            strategy_explanation=result.get("strategy_explanation", ""),
+            suggestions=suggestions,
+            tips=result.get("tips", []),
+            should_wait_more=result.get("should_wait_more", False),
+            recommended_additional_wait_hours=result.get("recommended_additional_wait_hours"),
         )

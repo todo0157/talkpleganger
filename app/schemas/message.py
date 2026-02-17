@@ -30,12 +30,23 @@ class AutoModeRequest(BaseModel):
     context_messages: list[IncomingMessage] = Field(
         default_factory=list, description="Recent conversation context (optional)"
     )
+    # Context memory settings
+    auto_fetch_context: bool = Field(
+        default=True, description="Automatically fetch context from chat history"
+    )
+    context_window_size: int = Field(
+        default=10, ge=1, le=20, description="Number of context messages to fetch"
+    )
     # Response preferences
     response_length: Optional[str] = Field(
         default=None, description="Preferred length: short/medium/long"
     )
     include_emoji: Optional[bool] = Field(
         default=None, description="Override emoji usage"
+    )
+    # Timing recommendation
+    include_timing: bool = Field(
+        default=True, description="Include timing recommendation in response"
     )
 
 

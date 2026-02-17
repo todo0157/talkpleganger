@@ -1,6 +1,9 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from enum import Enum
+
+if TYPE_CHECKING:
+    from .timing import TimingRecommendation
 
 
 class EmotionType(str, Enum):
@@ -52,6 +55,12 @@ class AutoModeResponse(BaseModel):
     )
     emotion_analysis: Optional[EmotionAnalysis] = Field(
         default=None, description="Emotion analysis of incoming message"
+    )
+    timing_recommendation: Optional[dict] = Field(
+        default=None, description="Recommended response timing"
+    )
+    context_used: int = Field(
+        default=0, description="Number of context messages used"
     )
 
 

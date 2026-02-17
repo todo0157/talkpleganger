@@ -1,7 +1,7 @@
 """
 DALL-E Service
 
-Handles image generation for alibi support images.
+Handles image generation for alibi support images and reaction images.
 """
 
 from openai import AsyncOpenAI
@@ -9,6 +9,11 @@ from openai import AsyncOpenAI
 from ..config import get_settings
 from ..schemas.message import AlibiImageRequest
 from ..schemas.response import AlibiImageResponse
+from ..schemas.reaction_image import (
+    ReactionImageRequest,
+    ReactionImageResponse,
+    ReactionStyle,
+)
 from ..prompts import SystemPromptGenerator
 
 
@@ -74,3 +79,70 @@ class DalleService:
             base_tips.append("음식이나 분위기에 대한 코멘트를 준비하세요.")
 
         return base_tips
+
+    async def generate_reaction_image(
+        self, request: ReactionImageRequest
+    ) -> ReactionImageResponse:
+        """
+        Generate an emotion-based reaction image.
+
+        Creates an expressive image suitable for use as a chat reaction.
+        """
+        # Generate optimized prompt
+        prompt = SystemPromptGenerator.generate_reaction_image_prompt(
+            emotion=request.emotion.value,
+            style=request.style.value,
+            context=request.message_context,
+        )
+
+        # Call DALL-E API
+        response = await self.client.images.generate(
+            model=self.model,
+            prompt=prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+
+        image_url = response.data[0].url
+
+        # Get usage suggestion
+        suggested_usage = SystemPromptGenerator.get_emotion_usage_suggestion(
+            request.emotion.value
+        )
+
+        # Generate alternative prompts for regeneration
+        alternative_prompts = self._generate_alternative_prompts(
+            request.emotion.value, request.style.value
+        )
+
+        return ReactionImageResponse(
+            image_url=image_url,
+            emotion=request.emotion.value,
+            style=request.style.value,
+            prompt_used=prompt,
+            suggested_usage=suggested_usage,
+            alternative_prompts=alternative_prompts,
+        )
+
+    def _generate_alternative_prompts(
+        self,
+        emotion: str,
+        current_style: str
+    ) -> list[str]:
+        """Generate alternative prompts for different styles."""
+        alternatives = []
+        other_styles = [
+            s.value for s in ReactionStyle
+            if s.value != current_style
+        ][:3]  # Get up to 3 alternative styles
+
+        for style in other_styles:
+            alt_prompt = SystemPromptGenerator.generate_reaction_image_prompt(
+                emotion=emotion,
+                style=style,
+                context=None,
+            )
+            alternatives.append(alt_prompt)
+
+        return alternatives

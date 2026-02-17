@@ -104,6 +104,27 @@ class DatabaseStore:
                 ON chat_history(created_at)
             """)
 
+            # Response timing table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS response_timing (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    persona_id TEXT NOT NULL,
+                    sender_pattern TEXT,
+                    avg_response_time_minutes REAL,
+                    min_response_time_minutes REAL,
+                    max_response_time_minutes REAL,
+                    time_of_day_preference TEXT,
+                    sample_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (persona_id) REFERENCES personas(user_id)
+                )
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_response_timing_persona_id
+                ON response_timing(persona_id)
+            """)
+
     # ============================================================
     # PERSONA OPERATIONS
     # ============================================================
@@ -327,6 +348,111 @@ class DatabaseStore:
                 "last_message": row["last_message"],
                 "emotion_distribution": emotion_dist,
             }
+
+    def get_context_messages(
+        self,
+        user_id: str,
+        sender_id: str = None,
+        limit: int = 10
+    ) -> list[dict]:
+        """Get recent messages for context window."""
+        with self._get_cursor() as cursor:
+            if sender_id:
+                cursor.execute("""
+                    SELECT sender_name, sender_id, message_text, response_text, created_at
+                    FROM chat_history
+                    WHERE user_id = ? AND sender_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """, (user_id, sender_id, limit))
+            else:
+                cursor.execute("""
+                    SELECT sender_name, sender_id, message_text, response_text, created_at
+                    FROM chat_history
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """, (user_id, limit))
+            rows = cursor.fetchall()
+            # Return in chronological order (oldest first)
+            return [dict(row) for row in reversed(rows)]
+
+    # ============================================================
+    # RESPONSE TIMING OPERATIONS
+    # ============================================================
+    def save_timing_pattern(
+        self,
+        persona_id: str,
+        avg_minutes: float,
+        min_minutes: float,
+        max_minutes: float,
+        time_of_day_pref: dict = None,
+        sample_count: int = 0,
+        sender_pattern: str = None,
+    ) -> int:
+        """Save timing pattern for a persona."""
+        with self._get_cursor() as cursor:
+            time_of_day_json = json.dumps(time_of_day_pref or {}, ensure_ascii=False)
+
+            cursor.execute("""
+                INSERT INTO response_timing (
+                    persona_id, sender_pattern, avg_response_time_minutes,
+                    min_response_time_minutes, max_response_time_minutes,
+                    time_of_day_preference, sample_count, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    avg_response_time_minutes = excluded.avg_response_time_minutes,
+                    min_response_time_minutes = excluded.min_response_time_minutes,
+                    max_response_time_minutes = excluded.max_response_time_minutes,
+                    time_of_day_preference = excluded.time_of_day_preference,
+                    sample_count = excluded.sample_count,
+                    updated_at = excluded.updated_at
+            """, (
+                persona_id, sender_pattern, avg_minutes,
+                min_minutes, max_minutes, time_of_day_json,
+                sample_count, datetime.now().isoformat()
+            ))
+            return cursor.lastrowid
+
+    def get_timing_pattern(
+        self,
+        persona_id: str,
+        sender_pattern: str = None
+    ) -> Optional[dict]:
+        """Get timing pattern for a persona."""
+        with self._get_cursor() as cursor:
+            if sender_pattern:
+                cursor.execute("""
+                    SELECT * FROM response_timing
+                    WHERE persona_id = ? AND sender_pattern = ?
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """, (persona_id, sender_pattern))
+            else:
+                cursor.execute("""
+                    SELECT * FROM response_timing
+                    WHERE persona_id = ?
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """, (persona_id,))
+
+            row = cursor.fetchone()
+            if row:
+                result = dict(row)
+                result["time_of_day_preference"] = json.loads(
+                    result.get("time_of_day_preference") or "{}"
+                )
+                return result
+            return None
+
+    def delete_timing_patterns(self, persona_id: str) -> bool:
+        """Delete all timing patterns for a persona."""
+        with self._get_cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM response_timing WHERE persona_id = ?",
+                (persona_id,)
+            )
+            return cursor.rowcount > 0
 
 
 # Singleton instance

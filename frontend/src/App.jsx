@@ -5,6 +5,8 @@ import AutoMode from './pages/AutoMode'
 import AssistMode from './pages/AssistMode'
 import AlibiMode from './pages/AlibiMode'
 import HistoryPage from './pages/HistoryPage'
+import FollowUpMode from './pages/FollowUpMode'
+import ReactionImagePage from './pages/ReactionImagePage'
 import './App.css'
 
 function App() {
@@ -21,6 +23,8 @@ function App() {
             <NavLink to="/persona">페르소나</NavLink>
             <NavLink to="/auto">Auto</NavLink>
             <NavLink to="/assist">Assist</NavLink>
+            <NavLink to="/followup">읽씹</NavLink>
+            <NavLink to="/reaction">이미지</NavLink>
             <NavLink to="/alibi">Alibi</NavLink>
             <NavLink to="/history">히스토리</NavLink>
           </div>
@@ -32,6 +36,8 @@ function App() {
             <Route path="/persona" element={<PersonaPage />} />
             <Route path="/auto" element={<AutoMode />} />
             <Route path="/assist" element={<AssistMode />} />
+            <Route path="/followup" element={<FollowUpMode />} />
+            <Route path="/reaction" element={<ReactionImagePage />} />
             <Route path="/alibi" element={<AlibiMode />} />
             <Route path="/history" element={<HistoryPage />} />
           </Routes>
@@ -43,21 +49,21 @@ function App() {
             <span>🏠</span>
             <span>홈</span>
           </NavLink>
-          <NavLink to="/persona">
-            <span>👤</span>
-            <span>페르소나</span>
-          </NavLink>
           <NavLink to="/auto">
             <span>🤖</span>
             <span>Auto</span>
           </NavLink>
+          <NavLink to="/followup">
+            <span>💬</span>
+            <span>읽씹</span>
+          </NavLink>
+          <NavLink to="/reaction">
+            <span>🎨</span>
+            <span>이미지</span>
+          </NavLink>
           <NavLink to="/history">
             <span>📜</span>
-            <span>히스토리</span>
-          </NavLink>
-          <NavLink to="/alibi">
-            <span>📢</span>
-            <span>Alibi</span>
+            <span>기록</span>
           </NavLink>
         </nav>
       </div>

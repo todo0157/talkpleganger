@@ -33,19 +33,32 @@ talkpleganger/
 │   ├── config.py          # 환경변수 설정
 │   ├── routers/           # API 라우터
 │   │   ├── persona.py     # 페르소나 CRUD
-│   │   ├── auto.py        # Auto 모드 (감정 분석 포함)
+│   │   ├── auto.py        # Auto 모드 (감정 분석 + 맥락 기억 + 타이밍)
 │   │   ├── assist.py      # Assist 모드
 │   │   ├── alibi.py       # Alibi 모드
-│   │   └── history.py     # 대화 히스토리
+│   │   ├── history.py     # 대화 히스토리
+│   │   ├── timing.py      # 답장 타이밍 분석/추천
+│   │   ├── followup.py    # 읽씹 대응 메시지
+│   │   └── reaction.py    # 리액션 이미지 생성
 │   ├── services/          # 비즈니스 로직
+│   │   ├── gpt_service.py # GPT API + 후속 메시지 생성
+│   │   ├── dalle_service.py # DALL-E + 리액션 이미지
+│   │   ├── timing_service.py # 타이밍 분석 서비스
+│   │   └── persona_engine.py # 페르소나 분석
 │   ├── schemas/           # Pydantic 모델
+│   │   ├── timing.py      # 타이밍 스키마
+│   │   ├── followup.py    # 읽씹 대응 스키마
+│   │   └── reaction_image.py # 리액션 이미지 스키마
 │   ├── prompts/           # GPT 프롬프트 템플릿
 │   └── storage/           # 저장소
-│       ├── database.py    # SQLite DB
+│       ├── database.py    # SQLite DB (+ response_timing 테이블)
 │       └── memory_store.py # 인메모리 (deprecated)
 ├── frontend/              # React 프론트엔드
 │   └── src/
 │       ├── pages/         # 페이지 컴포넌트
+│       │   ├── AutoMode.jsx      # 자동 응답 (맥락+타이밍 포함)
+│       │   ├── FollowUpMode.jsx  # 읽씹 대응 페이지
+│       │   └── ReactionImagePage.jsx # 이미지 답장 페이지
 │       ├── api.js         # API 클라이언트
 │       └── App.jsx        # 메인 라우터
 └── talkpleganger.db       # SQLite 데이터베이스 파일
@@ -77,6 +90,12 @@ talkpleganger/
 ### 5. DALLEService (`app/services/dalle_service.py`)
 - DALL-E 3 이미지 생성
 - 알리바이 증거 이미지 생성
+- **리액션 이미지 생성** (감정 기반)
+
+### 6. TimingService (`app/services/timing_service.py`)
+- 카카오톡 대화 패턴에서 응답 시간 분석
+- 시간대별 응답 패턴 저장
+- 자연스러운 답장 타이밍 추천
 
 ## 다중 페르소나 기능
 
@@ -100,6 +119,54 @@ talkpleganger/
 - Auto 모드에서 카테고리별 빠른 페르소나 전환
 - 페르소나 목록에 카테고리 배지 표시
 - 카테고리 필터로 페르소나 그룹 관리
+
+## 신규 기능 (v2.0)
+
+### 1. Context Memory (대화 맥락 기억)
+Auto 모드에서 최근 대화 내용을 자동으로 불러와 더 자연스러운 응답 생성
+
+```python
+class AutoModeRequest(BaseModel):
+    auto_fetch_context: bool = True     # 자동 맥락 로딩
+    context_window_size: int = 10       # 최근 N개 대화 사용 (최대 20)
+    include_timing: bool = True         # 타이밍 추천 포함
+```
+
+### 2. Timing Recommendation (답장 타이밍 추천)
+카카오톡 대화 패턴을 분석하여 자연스러운 답장 시간 추천
+
+| 시간대 | 설명 |
+|--------|------|
+| early_morning | 6-9시 |
+| morning | 9-12시 |
+| afternoon | 12-18시 |
+| evening | 18-22시 |
+| night | 22-6시 |
+
+### 3. Follow-up Messages (읽씹 대응)
+답장이 없을 때 자연스러운 후속 메시지 생성
+
+| 전략 | 경과 시간 | 설명 |
+|------|----------|------|
+| gentle_reminder | 1-2시간 | 부드러운 리마인더 |
+| casual_check | 2-4시간 | 가벼운 안부 |
+| conversation_starter | 4-8시간 | 새 화제 전환 |
+| topic_change | 8-24시간 | 주제 변경 |
+| reconnect | 24시간+ | 다시 연결 |
+
+### 4. Reaction Images (이미지 답장)
+감정에 맞는 리액션 이미지를 DALL-E로 생성
+
+**지원 감정**: happy, sad, angry, surprised, love, tired, confused, excited, grateful, apologetic
+
+**이미지 스타일**:
+- meme: 밈 스타일
+- emoji_art: 이모지 아트
+- cute_character: 귀여운 캐릭터
+- sticker: 스티커
+- minimal: 미니멀 라인아트
+
+---
 
 ## 감정 분석 기능
 
@@ -161,13 +228,21 @@ OPENAI_API_KEY=sk-...
 | `POST /persona/` | 페르소나 생성 |
 | `POST /persona/parse-kakao` | 카톡 파일 파싱 |
 | `POST /persona/create-from-kakao` | 카톡에서 페르소나 생성 |
-| `POST /auto/respond` | 자동 응답 생성 (감정 분석 포함) |
+| `POST /auto/respond` | 자동 응답 생성 (맥락 기억 + 감정 분석 + 타이밍 추천) |
 | `POST /assist/suggest` | 멘트 추천 |
 | `POST /alibi/announce` | 그룹별 공지 생성 |
 | `POST /alibi/image` | 알리바이 이미지 생성 |
 | `GET /history/{user_id}` | 대화 기록 조회 |
 | `GET /history/{user_id}/stats` | 대화 통계 |
 | `DELETE /history/{user_id}` | 대화 기록 삭제 |
+| `POST /timing/analyze` | 카톡 파일에서 타이밍 패턴 분석 |
+| `GET /timing/{persona_id}/recommend` | 답장 타이밍 추천 |
+| `GET /timing/{persona_id}/patterns` | 저장된 타이밍 패턴 조회 |
+| `POST /followup/suggest` | 읽씹 대응 메시지 생성 |
+| `GET /followup/strategies` | 읽씹 대응 전략 목록 |
+| `POST /reaction/generate` | 리액션 이미지 생성 |
+| `GET /reaction/emotions` | 지원 감정 목록 |
+| `GET /reaction/styles` | 이미지 스타일 목록 |
 
 ## 데이터 모델
 
@@ -189,6 +264,8 @@ OPENAI_API_KEY=sk-...
 - `detected_intent`: 감지된 의도
 - `suggested_alternatives`: 대안 답장들
 - `emotion_analysis`: 감정 분석 결과
+- `timing_recommendation`: 답장 타이밍 추천 (신규)
+- `context_used`: 사용된 맥락 메시지 수 (신규)
 
 ### ChatHistory (DB)
 - `id`: 메시지 ID
@@ -206,6 +283,7 @@ OPENAI_API_KEY=sk-...
 ### SQLite 테이블
 1. **personas**: 페르소나 프로필 저장
 2. **chat_history**: 대화 기록 저장 (감정 분석 포함)
+3. **response_timing**: 응답 시간 패턴 저장
 
 ### 데이터 영속성
 - 서버 재시작해도 데이터 유지
