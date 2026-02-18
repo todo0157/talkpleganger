@@ -27,6 +27,10 @@ function AutoMode() {
   const [contextWindowSize, setContextWindowSize] = useState(10)
   // Timing Settings
   const [includeTiming, setIncludeTiming] = useState(true)
+  // Manual Edit Mode
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editedAnswer, setEditedAnswer] = useState('')
+  const [editHistory, setEditHistory] = useState([]) // 수정 이력 저장
 
   useEffect(() => {
     loadPersonas()
@@ -78,6 +82,50 @@ function AutoMode() {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
     alert('클립보드에 복사되었습니다!')
+  }
+
+  // Manual Edit Mode Functions
+  const enterEditMode = () => {
+    setIsEditMode(true)
+    setEditedAnswer(response?.answer || '')
+  }
+
+  const exitEditMode = () => {
+    setIsEditMode(false)
+  }
+
+  const saveEditedAnswer = () => {
+    if (response && editedAnswer.trim()) {
+      // 이력에 원본 저장
+      setEditHistory(prev => [...prev, response.answer])
+      // 응답 업데이트
+      setResponse({
+        ...response,
+        answer: editedAnswer.trim(),
+        isEdited: true,
+      })
+      setIsEditMode(false)
+    }
+  }
+
+  const revertToOriginal = () => {
+    if (editHistory.length > 0) {
+      const lastOriginal = editHistory[editHistory.length - 1]
+      setEditedAnswer(lastOriginal)
+      setResponse({
+        ...response,
+        answer: lastOriginal,
+        isEdited: false,
+      })
+      setEditHistory(prev => prev.slice(0, -1))
+    }
+  }
+
+  const regenerateResponse = async () => {
+    if (!selectedPersona || !message) return
+    setIsEditMode(false)
+    setEditHistory([])
+    await handleSubmit({ preventDefault: () => {} })
   }
 
   const getConfidenceClass = (score) => {
@@ -250,8 +298,8 @@ function AutoMode() {
                 />
               </div>
 
-              {/* Context & Timing Settings */}
-              <div style={{
+              {/* Context & Timing Settings - Desktop Only */}
+              <div className="desktop-settings" style={{
                 background: 'rgba(255,255,255,0.05)',
                 borderRadius: '12px',
                 padding: '1rem',
@@ -386,18 +434,111 @@ function AutoMode() {
 
               <div className="response-box">
                 <div className="response-header">
-                  <span className="response-label">추천 답장</span>
-                  <span className={`confidence-badge ${getConfidenceClass(response.confidence_score)}`}>
-                    신뢰도: {Math.round(response.confidence_score * 100)}%
+                  <span className="response-label">
+                    {response.isEdited ? '✏️ 수정된 답장' : '추천 답장'}
                   </span>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <span className={`confidence-badge ${getConfidenceClass(response.confidence_score)}`}>
+                      신뢰도: {Math.round(response.confidence_score * 100)}%
+                    </span>
+                    {/* Auto/Manual Mode Toggle */}
+                    <button
+                      onClick={() => isEditMode ? exitEditMode() : enterEditMode()}
+                      style={{
+                        padding: '0.3rem 0.6rem',
+                        borderRadius: '6px',
+                        border: isEditMode ? '1px solid var(--primary)' : '1px solid var(--border)',
+                        background: isEditMode ? 'rgba(254, 229, 0, 0.2)' : 'rgba(255,255,255,0.1)',
+                        color: isEditMode ? 'var(--primary)' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                      }}
+                    >
+                      {isEditMode ? '🔒 자동' : '✏️ 수동'}
+                    </button>
+                  </div>
                 </div>
-                <div className="response-text">{response.answer}</div>
-                <button
-                  className="btn btn-secondary copy-btn"
-                  onClick={() => copyToClipboard(response.answer)}
-                >
-                  📋 복사하기
-                </button>
+
+                {/* Edit Mode */}
+                {isEditMode ? (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <textarea
+                      value={editedAnswer}
+                      onChange={(e) => setEditedAnswer(e.target.value)}
+                      style={{
+                        width: '100%',
+                        minHeight: '120px',
+                        padding: '1rem',
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '2px solid var(--primary)',
+                        borderRadius: '10px',
+                        color: 'var(--text-light)',
+                        fontSize: '1rem',
+                        lineHeight: '1.7',
+                        resize: 'vertical',
+                      }}
+                      placeholder="답장을 직접 수정하세요..."
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                      <button
+                        className="btn btn-primary"
+                        onClick={saveEditedAnswer}
+                        disabled={!editedAnswer.trim()}
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                      >
+                        💾 저장
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={exitEditMode}
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                      >
+                        ❌ 취소
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={regenerateResponse}
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                      >
+                        🔄 재생성
+                      </button>
+                      {editHistory.length > 0 && (
+                        <button
+                          className="btn btn-secondary"
+                          onClick={revertToOriginal}
+                          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                        >
+                          ↩️ 원본 복원
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="response-text">{response.answer}</div>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                      <button
+                        className="btn btn-secondary copy-btn"
+                        onClick={() => copyToClipboard(response.answer)}
+                      >
+                        📋 복사하기
+                      </button>
+                      <button
+                        className="btn btn-secondary copy-btn"
+                        onClick={enterEditMode}
+                      >
+                        ✏️ 수정하기
+                      </button>
+                      <button
+                        className="btn btn-secondary copy-btn"
+                        onClick={regenerateResponse}
+                      >
+                        🔄 재생성
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Timing Recommendation */}
@@ -478,6 +619,46 @@ function AutoMode() {
             </div>
           )}
         </>
+      )}
+
+      {/* Mobile Settings Bar - Fixed at Bottom */}
+      {personas.length > 0 && (
+        <div className="mobile-settings-bar">
+          <button
+            className={`mobile-setting-toggle ${autoFetchContext ? 'active' : ''}`}
+            onClick={() => setAutoFetchContext(!autoFetchContext)}
+          >
+            🧠 맥락 {autoFetchContext ? 'ON' : 'OFF'}
+          </button>
+          <button
+            className={`mobile-setting-toggle ${includeTiming ? 'active' : ''}`}
+            onClick={() => setIncludeTiming(!includeTiming)}
+          >
+            ⏱️ 타이밍 {includeTiming ? 'ON' : 'OFF'}
+          </button>
+          {autoFetchContext && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.4rem 0.6rem',
+              background: 'rgba(255,255,255,0.05)',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              color: 'var(--text-muted)',
+            }}>
+              <span>{contextWindowSize}</span>
+              <input
+                type="range"
+                min="5"
+                max="20"
+                value={contextWindowSize}
+                onChange={(e) => setContextWindowSize(parseInt(e.target.value))}
+                style={{ width: '50px', height: '4px' }}
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

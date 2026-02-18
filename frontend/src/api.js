@@ -66,6 +66,16 @@ export const alibiAPI = {
     if (groups) groups.forEach(g => params.append('include_groups', g))
     return api.post(`/alibi/quick-announce?${params}`)
   },
+  // Tone-based announcement
+  analyzeTone: (file, myName = '나') => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('my_name', myName)
+    return axios.post(`${API_BASE}/alibi/analyze-tone`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  announceWithTone: (data) => api.post('/alibi/announce-with-tone', data),
 }
 
 // Chat History API

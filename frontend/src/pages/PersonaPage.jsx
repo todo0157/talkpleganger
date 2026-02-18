@@ -345,6 +345,16 @@ function PersonaPage() {
                   <span className="confidence-badge confidence-high">
                     {parsedPreview.total_messages}개 메시지
                   </span>
+                  {parsedPreview.encoding_used && (
+                    <span className="confidence-badge" style={{
+                      marginLeft: '0.5rem',
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      color: '#3b82f6',
+                      border: '1px solid rgba(59, 130, 246, 0.3)'
+                    }}>
+                      {parsedPreview.encoding_used}
+                    </span>
+                  )}
                   {isGroupChat && (
                     <span className="confidence-badge confidence-medium" style={{ marginLeft: '0.5rem' }}>
                       👥 그룹채팅 ({Object.keys(participants).length}명)

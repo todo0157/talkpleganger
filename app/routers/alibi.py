@@ -1,15 +1,17 @@
 """
 Alibi Mode Router
 
-Endpoints for 1:N announcements and alibi image generation.
+Endpoints for 1:N announcements, alibi image generation, and tone-based announcements.
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
+from typing import Optional
 
-from ..schemas.message import AlibiModeRequest, AlibiImageRequest
+from ..schemas.message import AlibiModeRequest, AlibiImageRequest, ChatToneAnalysis, ToneBasedAnnouncementRequest
 from ..schemas.response import AlibiMessageResponse, AlibiImageResponse
 from ..services.gpt_service import GPTService
 from ..services.dalle_service import DalleService
+from ..services.kakao_parser import KakaoParser
 
 router = APIRouter(prefix="/alibi", tags=["Alibi Mode"])
 
@@ -143,3 +145,97 @@ async def quick_announce(
     response = await gpt_service.generate_alibi_messages(request=request)
 
     return response
+
+
+# ============================================================
+# Tone Analysis Endpoints
+# ============================================================
+
+@router.post(
+    "/analyze-tone",
+    response_model=ChatToneAnalysis,
+    summary="Analyze chat tone from KakaoTalk file",
+    description="Upload a KakaoTalk chat file to analyze the tone and style.",
+)
+async def analyze_chat_tone(
+    file: UploadFile = File(...),
+    my_name: str = Form(default="나"),
+):
+    """
+    Analyze the tone of a KakaoTalk chat export file.
+
+    This endpoint extracts linguistic features from the chat:
+    - Formality level (formal/casual/intimate)
+    - Emoji usage patterns
+    - Common expressions and phrases
+    - Sentence ending styles (요/ㅋㅋ/임/등)
+
+    Use this analysis to generate announcements matching the chat's style.
+    """
+    if not file.filename.endswith('.txt'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="txt 파일만 지원됩니다.",
+        )
+
+    try:
+        content = await file.read()
+
+        if len(content) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="파일이 비어있습니다.",
+            )
+
+        # Parse chat file
+        examples, parse_result = KakaoParser.parse_from_bytes(
+            content=content,
+            my_name=my_name,
+            max_examples=100,  # More examples for better analysis
+        )
+
+        if not parse_result.success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=parse_result.error_message,
+            )
+
+        if len(examples) < 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="톤 분석을 위해 최소 5개의 메시지가 필요합니다.",
+            )
+
+        # Analyze tone using GPT
+        gpt_service = GPTService()
+        tone_analysis = await gpt_service.analyze_chat_tone(examples)
+
+        return tone_analysis
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"톤 분석 중 오류가 발생했습니다: {str(e)}",
+        )
+
+
+@router.post(
+    "/announce-with-tone",
+    summary="Generate announcement matching chat tone",
+    description="Generate an announcement that matches the analyzed chat tone.",
+)
+async def announce_with_tone(request: ToneBasedAnnouncementRequest):
+    """
+    Generate an announcement that matches the analyzed chat tone.
+
+    The announcement will:
+    - Use the same formality level as the chat
+    - Include similar emoji patterns
+    - Use common expressions from the chat
+    - Match sentence ending styles
+    """
+    gpt_service = GPTService()
+    result = await gpt_service.generate_tone_based_announcement(request)
+    return result

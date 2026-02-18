@@ -15,7 +15,10 @@ from ..schemas.message import (
     AssistModeRequest,
     AlibiModeRequest,
     RecipientGroup,
+    ChatToneAnalysis,
+    ToneBasedAnnouncementRequest,
 )
+from ..schemas.persona import ChatExample
 from ..schemas.response import (
     AutoModeResponse,
     AssistModeResponse,
@@ -306,3 +309,122 @@ class GPTService:
             should_wait_more=result.get("should_wait_more", False),
             recommended_additional_wait_hours=result.get("recommended_additional_wait_hours"),
         )
+
+    # ============================================================
+    # TONE ANALYSIS
+    # ============================================================
+    async def analyze_chat_tone(
+        self,
+        chat_examples: list[ChatExample],
+    ) -> ChatToneAnalysis:
+        """
+        Analyze the tone of chat messages to extract linguistic features.
+
+        Returns analysis of:
+        - Formality level
+        - Emoji usage patterns
+        - Common expressions
+        - Sentence ending styles
+        """
+        # Build examples text
+        examples_text = "\n".join([
+            f"[{ex.role}] {ex.content}"
+            for ex in chat_examples[:50]  # Limit to 50 examples
+        ])
+
+        system_prompt = """당신은 한국어 언어학 전문가입니다. 주어진 카카오톡 대화를 분석하여 대화방의 톤과 스타일을 추출하세요.
+
+분석 항목:
+1. formality_level: 격식 수준 (formal/semi-formal/casual/intimate)
+2. emoji_usage: 이모지 사용 빈도 (none/minimal/moderate/heavy)
+3. common_expressions: 자주 사용하는 표현들 (최대 5개)
+4. sentence_endings: 자주 사용하는 문장 끝맺음 (예: ~요, ~ㅋㅋ, ~임, ~ㅇㅇ, ~네 등)
+5. overall_tone: 전체적인 톤 설명 (1-2문장)
+6. recommended_style: 이 대화방에 공지를 보낼 때 추천하는 스타일 (1문장)
+
+결과를 JSON 형식으로 반환하세요."""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"다음 대화를 분석해주세요:\n\n{examples_text}"},
+        ]
+
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            max_tokens=1000,
+            temperature=0.3,
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        return ChatToneAnalysis(
+            formality_level=result.get("formality_level", "casual"),
+            emoji_usage=result.get("emoji_usage", "moderate"),
+            common_expressions=result.get("common_expressions", []),
+            sentence_endings=result.get("sentence_endings", []),
+            overall_tone=result.get("overall_tone", ""),
+            recommended_style=result.get("recommended_style", ""),
+        )
+
+    async def generate_tone_based_announcement(
+        self,
+        request: ToneBasedAnnouncementRequest,
+    ) -> dict:
+        """
+        Generate an announcement that matches the analyzed chat tone.
+
+        Uses the tone analysis to generate a message that fits naturally
+        in the target chat room.
+        """
+        tone = request.tone_analysis
+
+        system_prompt = f"""당신은 카카오톡 메시지 작성 전문가입니다.
+주어진 공지 내용을 대화방의 톤에 맞게 변환해주세요.
+
+대화방 톤 분석:
+- 격식 수준: {tone.formality_level}
+- 이모지 사용: {tone.emoji_usage}
+- 자주 쓰는 표현: {', '.join(tone.common_expressions)}
+- 문장 끝맺음 스타일: {', '.join(tone.sentence_endings)}
+- 전체적인 톤: {tone.overall_tone}
+- 추천 스타일: {tone.recommended_style}
+
+위 톤에 맞춰 공지를 자연스럽게 작성해주세요.
+결과를 JSON 형식으로 반환하세요:
+{{
+    "generated_message": "생성된 메시지",
+    "tone_matched": true/false,
+    "style_notes": "적용된 스타일 설명",
+    "alternative_version": "다른 버전의 메시지 (선택)"
+}}"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"다음 공지를 변환해주세요:\n\n{request.announcement}"},
+        ]
+
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            max_tokens=1000,
+            temperature=0.7,
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        return {
+            "original_announcement": request.announcement,
+            "generated_message": result.get("generated_message", ""),
+            "tone_matched": result.get("tone_matched", True),
+            "style_notes": result.get("style_notes", ""),
+            "alternative_version": result.get("alternative_version"),
+            "group_name": request.group_name,
+            "tone_analysis_summary": {
+                "formality": tone.formality_level,
+                "emoji_usage": tone.emoji_usage,
+                "overall_tone": tone.overall_tone,
+            },
+        }

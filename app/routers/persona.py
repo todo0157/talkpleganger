@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from ..schemas.persona import PersonaProfile, PersonaCreate, PersonaUpdate, ChatExample, PersonaCategory
 from ..services.persona_engine import PersonaEngine
-from ..services.kakao_parser import KakaoParser
+from ..services.kakao_parser import KakaoParser, ParseResult
 
 router = APIRouter(prefix="/persona", tags=["Persona Management"])
 
@@ -25,6 +25,8 @@ class ParsedChatResponse(BaseModel):
     total_messages: int
     is_group_chat: bool = False
     participants: dict[str, int] = {}
+    encoding_used: Optional[str] = None
+    error_details: Optional[str] = None
 
 
 class ChatStatsResponse(BaseModel):
@@ -56,46 +58,56 @@ async def parse_kakao_chat(
     1. Open chat room
     2. Click menu (≡) → Export chat
     3. Select "Save as text"
+
+    Supports multiple encodings: UTF-8, CP949, EUC-KR (auto-detected)
     """
     if not file.filename.endswith('.txt'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only .txt files are supported",
+            detail="txt 파일만 지원됩니다. 카카오톡에서 '텍스트로 저장'을 선택해주세요.",
         )
 
     try:
         content = await file.read()
 
-        for encoding in ['utf-8', 'cp949', 'euc-kr']:
-            try:
-                text = content.decode(encoding)
-                break
-            except UnicodeDecodeError:
-                continue
-        else:
+        if len(content) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not decode file. Please ensure it's a valid text file.",
+                detail="파일이 비어있습니다.",
             )
 
-        # Get chat statistics
-        stats = KakaoParser.get_chat_stats(text)
-        detected_names = list(stats["participants"].keys())
-
-        examples = KakaoParser.parse_chat_file(
-            content=text,
+        # Use improved parsing with automatic encoding detection
+        examples, parse_result = KakaoParser.parse_from_bytes(
+            content=content,
             my_name=my_name,
             max_examples=max_examples,
         )
 
+        if not parse_result.success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=parse_result.error_message,
+            )
+
+        # Get chat statistics using the decoded content
+        stats = KakaoParser.get_chat_stats(parse_result.content)
+        detected_names = list(stats["participants"].keys())
+
+        if len(examples) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"메시지를 찾을 수 없습니다. '{my_name}'이 대화방에서 사용하는 이름이 맞는지 확인해주세요. 감지된 참여자: {', '.join(detected_names[:5])}",
+            )
+
         return ParsedChatResponse(
             success=True,
-            message=f"Successfully parsed {len(examples)} messages from {stats['participant_count']} participants",
+            message=f"{stats['participant_count']}명의 참여자로부터 {len(examples)}개 메시지를 파싱했습니다 ({parse_result.encoding_used} 인코딩)",
             detected_names=detected_names,
             chat_examples=examples,
             total_messages=len(examples),
             is_group_chat=stats["is_group_chat"],
             participants=stats["participants"],
+            encoding_used=parse_result.encoding_used,
         )
 
     except HTTPException:
@@ -103,7 +115,7 @@ async def parse_kakao_chat(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error parsing file: {str(e)}",
+            detail=f"파일 파싱 중 오류가 발생했습니다: {str(e)}",
         )
 
 
@@ -123,38 +135,48 @@ async def create_persona_from_kakao(
     description: Optional[str] = Form(default=None),
     icon: Optional[str] = Form(default=None),
 ):
-    """Create a persona directly from a KakaoTalk exported chat file."""
+    """
+    Create a persona directly from a KakaoTalk exported chat file.
+
+    Supports multiple encodings: UTF-8, CP949, EUC-KR (auto-detected)
+    """
     if not file.filename.endswith('.txt'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only .txt files are supported",
+            detail="txt 파일만 지원됩니다. 카카오톡에서 '텍스트로 저장'을 선택해주세요.",
         )
 
     try:
         content = await file.read()
 
-        for encoding in ['utf-8', 'cp949', 'euc-kr']:
-            try:
-                text = content.decode(encoding)
-                break
-            except UnicodeDecodeError:
-                continue
-        else:
+        if len(content) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not decode file.",
+                detail="파일이 비어있습니다.",
             )
 
-        examples = KakaoParser.parse_chat_file(
-            content=text,
+        # Use improved parsing with automatic encoding detection
+        examples, parse_result = KakaoParser.parse_from_bytes(
+            content=content,
             my_name=my_name,
             max_examples=max_examples,
         )
 
-        if len(examples) < 3:
+        if not parse_result.success:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Not enough messages found. Found {len(examples)}, need at least 3.",
+                detail=parse_result.error_message,
+            )
+
+        if len(examples) < 3:
+            # Get detected names for helpful error message
+            stats, _ = KakaoParser.get_stats_from_bytes(content)
+            detected_names = list(stats.get("participants", {}).keys())[:5]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"충분한 메시지를 찾을 수 없습니다 ({len(examples)}개 발견, 최소 3개 필요). "
+                       f"'{my_name}'이 대화방에서 사용하는 이름이 맞는지 확인해주세요. "
+                       f"감지된 참여자: {', '.join(detected_names) if detected_names else '없음'}",
             )
 
         engine = PersonaEngine()
@@ -163,7 +185,7 @@ async def create_persona_from_kakao(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Persona for user {user_id} already exists.",
+                detail=f"'{user_id}' ID의 페르소나가 이미 존재합니다. 다른 ID를 사용하거나 기존 페르소나를 삭제해주세요.",
             )
 
         # Parse category
@@ -189,7 +211,7 @@ async def create_persona_from_kakao(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating persona: {str(e)}",
+            detail=f"페르소나 생성 중 오류가 발생했습니다: {str(e)}",
         )
 
 

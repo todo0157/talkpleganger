@@ -75,6 +75,9 @@ talkpleganger/
 - 카카오톡 내보내기 파일 파싱
 - 1:1 및 그룹채팅 지원
 - 참여자 감지 및 메시지 분류
+- **다중 인코딩 자동 감지** (UTF-8, UTF-8-BOM, CP949, EUC-KR, UTF-16)
+- **모바일/PC 내보내기 형식 모두 지원**
+- 상세한 에러 메시지 및 파싱 결과 피드백
 
 ### 3. GPTService (`app/services/gpt_service.py`)
 - OpenAI GPT-4o API 연동
@@ -168,6 +171,72 @@ class AutoModeRequest(BaseModel):
 
 ---
 
+## 신규 기능 (v2.1)
+
+### 1. 향상된 파일 파싱 (Enhanced File Parsing)
+카카오톡 내보내기 파일의 인코딩을 자동 감지하고 상세한 에러 피드백을 제공합니다.
+
+**지원 인코딩**: UTF-8, UTF-8-BOM, CP949, EUC-KR, UTF-16, UTF-16-LE, UTF-16-BE
+
+```python
+class EncodingDetector:
+    ENCODINGS = ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr', 'utf-16', 'utf-16-le', 'utf-16-be']
+
+class ParseResult:
+    success: bool
+    content: str
+    encoding_used: str
+    error_message: str
+```
+
+**개선 사항**:
+- 모바일/PC 카카오톡 내보내기 형식 모두 지원
+- BOM(Byte Order Mark) 자동 제거
+- 라인 엔딩 정규화 (\r\n → \n)
+- 감지된 참여자 목록 표시
+- 상세한 한국어 에러 메시지
+
+### 2. 수동 편집 모드 (Manual Edit Mode)
+Auto 모드에서 생성된 응답을 사용자가 직접 수정할 수 있습니다.
+
+**기능**:
+- 자동/수동 모드 전환 토글
+- 생성된 답장 직접 편집
+- 원본 복원 기능
+- 재생성 버튼
+- 수정 이력 관리
+
+### 3. 톤 맞춤 공지 (Tone-Based Announcement)
+채팅 파일을 분석하여 해당 톡방의 톤에 맞는 공지를 자동 생성합니다.
+
+```python
+class ChatToneAnalysis(BaseModel):
+    formality_level: str      # formal/semi-formal/casual/intimate
+    emoji_usage: str          # none/minimal/moderate/heavy
+    common_expressions: list  # 자주 쓰는 표현들
+    sentence_endings: list    # 문장 끝맺음 스타일 (~요, ~ㅋㅋ, ~임)
+    overall_tone: str         # 전체적인 톤 설명
+    recommended_style: str    # 추천 스타일
+```
+
+**워크플로우**:
+1. 채팅 파일 업로드 → 톤 자동 분석
+2. 공지 내용 입력
+3. 분석된 톤에 맞춰 공지 자동 생성
+4. 대안 버전 제공
+
+### 4. 모바일 설정 바 (Mobile Settings Bar)
+모바일에서 고급 설정을 쉽게 접근할 수 있는 하단 고정 바입니다.
+
+**위치**: 하단 네비게이션 바 바로 위에 고정
+
+**기능**:
+- 맥락 기억 ON/OFF 토글
+- 타이밍 추천 ON/OFF 토글
+- 맥락 윈도우 크기 슬라이더
+
+---
+
 ## 감정 분석 기능
 
 Auto 모드에서 상대방 메시지의 감정을 분석하고 톤을 자동 조절합니다.
@@ -231,6 +300,8 @@ OPENAI_API_KEY=sk-...
 | `POST /auto/respond` | 자동 응답 생성 (맥락 기억 + 감정 분석 + 타이밍 추천) |
 | `POST /assist/suggest` | 멘트 추천 |
 | `POST /alibi/announce` | 그룹별 공지 생성 |
+| `POST /alibi/analyze-tone` | 채팅 파일 톤 분석 (v2.1) |
+| `POST /alibi/announce-with-tone` | 톤 맞춤 공지 생성 (v2.1) |
 | `POST /alibi/image` | 알리바이 이미지 생성 |
 | `GET /history/{user_id}` | 대화 기록 조회 |
 | `GET /history/{user_id}/stats` | 대화 통계 |

@@ -122,3 +122,41 @@ class AlibiImageRequest(BaseModel):
     additional_details: Optional[str] = Field(
         default=None, description="Extra details to include in the image"
     )
+
+
+class ChatToneAnalysis(BaseModel):
+    """Analysis result of chat tone."""
+
+    formality_level: str = Field(
+        ..., description="Formality level: formal/semi-formal/casual/intimate"
+    )
+    emoji_usage: str = Field(
+        ..., description="Emoji usage frequency: none/minimal/moderate/heavy"
+    )
+    common_expressions: list[str] = Field(
+        default_factory=list, description="Common expressions/phrases used"
+    )
+    sentence_endings: list[str] = Field(
+        default_factory=list, description="Common sentence endings (요/임/ㅋㅋ/등)"
+    )
+    overall_tone: str = Field(
+        ..., description="Overall tone description"
+    )
+    recommended_style: str = Field(
+        ..., description="Recommended style for announcements"
+    )
+
+
+class ToneBasedAnnouncementRequest(BaseModel):
+    """Request for tone-based announcement generation."""
+
+    user_id: str = Field(..., description="User's ID")
+    announcement: str = Field(
+        ..., description="The core announcement/message to convey"
+    )
+    tone_analysis: ChatToneAnalysis = Field(
+        ..., description="Analyzed tone from chat"
+    )
+    group_name: str = Field(
+        default="", description="Name of the group/chat room"
+    )

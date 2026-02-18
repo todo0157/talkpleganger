@@ -686,6 +686,79 @@ body {
   }
 }
 
+/* ===== MOBILE SETTINGS BAR ===== */
+.mobile-settings-bar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mobile-settings-bar {
+    display: flex;
+    position: fixed;
+    bottom: 60px; /* Above mobile nav */
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, rgba(26, 26, 46, 0.98) 0%, var(--bg-card) 100%);
+    border-top: 1px solid var(--border);
+    padding: 0.6rem 1rem;
+    z-index: 99;
+    justify-content: space-around;
+    align-items: center;
+    backdrop-filter: blur(10px);
+  }
+
+  .mobile-settings-bar.expanded {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+    bottom: 60px;
+  }
+
+  .mobile-setting-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid transparent;
+    border-radius: 20px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .mobile-setting-toggle.active {
+    background: rgba(254, 229, 0, 0.15);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  .mobile-setting-toggle:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Hide desktop settings on mobile */
+  .desktop-settings {
+    display: none !important;
+  }
+
+  /* Adjust main content padding for settings bar */
+  .main-content.has-settings-bar {
+    padding-bottom: 8rem !important;
+  }
+}
+
+@media (min-width: 641px) {
+  .mobile-settings-bar {
+    display: none !important;
+  }
+
+  .desktop-settings {
+    display: block;
+  }
+}
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar {
   width: 8px;
