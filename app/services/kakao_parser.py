@@ -108,10 +108,11 @@ class EncodingDetector:
 
         # Check for KakaoTalk patterns
         kakao_patterns = [
-            r'\[(오전|오후)\s*\d{1,2}:\d{2}\]',  # Time pattern
+            r'\[(오전|오후)\s*\d{1,2}:\d{2}\]',  # Time pattern (PC/Android)
             r'님과 카카오톡 대화',  # Chat export header
             r'저장한 날짜',  # Save date
             r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일',  # Date pattern
+            r'\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{1,2}:\d{2},',  # iOS time pattern: "2025. 11. 9. 22:07,"
         ]
 
         found_pattern = False
@@ -153,6 +154,12 @@ class KakaoParser:
         r'^\[(.+?)\]\s+\[(오전|오후)\s*(\d{1,2}):(\d{2})\]\s+(.+)$'
     )
 
+    # iOS KakaoTalk export pattern: "2025. 11. 9. 22:07, 이름 : 메시지"
+    # Format: YYYY. MM. DD. HH:MM, 이름 : 메시지
+    MESSAGE_PATTERN_IOS = re.compile(
+        r'^\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{1,2}:\d{2},\s*(.+?)\s*:\s*(.+)$'
+    )
+
     # Pattern for date separators: "--- 2024년 1월 15일 ---" or "2024년 1월 15일 월요일"
     DATE_PATTERN = re.compile(r'^-*\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일.*-*$')
 
@@ -167,11 +174,13 @@ class KakaoParser:
         '파일을 보냈습니다',
         '이모티콘을 보냈습니다',
         '삭제된 메시지입니다',
+        '메시지가 삭제되었습니다',  # iOS format
         '님과 카카오톡 대화',
         '저장한 날짜',
         '채팅방 관리자가',
         '님이 나가셨습니다',
         '오픈채팅방',
+        '사진',  # iOS: just "사진" for photo
     ]
 
     @classmethod
@@ -269,10 +278,20 @@ class KakaoParser:
             if not line or cls.DATE_PATTERN.match(line):
                 continue
 
-            # Try to match message pattern (mobile format first, then PC format)
+            # Try to match message pattern (mobile format first, then PC format, then iOS)
             match = cls.MESSAGE_PATTERN.match(line)
+            sender_group = 1
+            message_group = 5
+
             if not match:
                 match = cls.MESSAGE_PATTERN_ALT.match(line)
+
+            if not match:
+                # Try iOS format: "2025. 11. 9. 22:07, 이름 : 메시지"
+                match = cls.MESSAGE_PATTERN_IOS.match(line)
+                if match:
+                    sender_group = 1
+                    message_group = 2
 
             if match:
                 # Save previous message if exists
@@ -286,8 +305,8 @@ class KakaoParser:
                         examples.append(ChatExample(role=role, content=msg_text))
 
                 # Start new message
-                current_sender = match.group(1).strip()
-                current_message = [match.group(5).strip()]
+                current_sender = match.group(sender_group).strip()
+                current_message = [match.group(message_group).strip()]
             else:
                 # Continuation of previous message (multi-line)
                 if current_sender is not None and line:
@@ -365,20 +384,28 @@ class KakaoParser:
         Detect all participants in the chat.
         Returns dict with participant names and message counts.
         Useful for identifying who is who in group chats.
-        Supports both mobile and PC export formats.
+        Supports mobile, PC, and iOS export formats.
         """
         lines = content.strip().split('\n')
         participants = {}
 
         for line in lines:
             line_stripped = line.strip()
-            # Try both mobile and PC patterns
+            # Try mobile, PC, then iOS patterns
             match = cls.MESSAGE_PATTERN.match(line_stripped)
+            sender_group = 1
+
             if not match:
                 match = cls.MESSAGE_PATTERN_ALT.match(line_stripped)
 
+            if not match:
+                # Try iOS format
+                match = cls.MESSAGE_PATTERN_IOS.match(line_stripped)
+                if match:
+                    sender_group = 1  # iOS pattern also uses group 1 for sender
+
             if match:
-                sender = match.group(1).strip()
+                sender = match.group(sender_group).strip()
                 if sender not in participants:
                     participants[sender] = 0
                 participants[sender] += 1
@@ -428,10 +455,20 @@ class KakaoParser:
             if not line or cls.DATE_PATTERN.match(line):
                 continue
 
-            # Try both mobile and PC patterns
+            # Try mobile, PC, then iOS patterns
             match = cls.MESSAGE_PATTERN.match(line)
+            sender_group = 1
+            message_group = 5
+
             if not match:
                 match = cls.MESSAGE_PATTERN_ALT.match(line)
+
+            if not match:
+                # Try iOS format
+                match = cls.MESSAGE_PATTERN_IOS.match(line)
+                if match:
+                    sender_group = 1
+                    message_group = 2
 
             if match:
                 if current_sender is not None and current_message:
@@ -453,8 +490,8 @@ class KakaoParser:
                             role = "user" if is_user else "other"
                             examples.append(ChatExample(role=role, content=msg_text))
 
-                current_sender = match.group(1).strip()
-                current_message = [match.group(5).strip()]
+                current_sender = match.group(sender_group).strip()
+                current_message = [match.group(message_group).strip()]
             else:
                 if current_sender is not None and line:
                     current_message.append(line)
