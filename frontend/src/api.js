@@ -18,18 +18,19 @@ export const personaAPI = {
   list: () => api.get('/persona/'),
 
   // KakaoTalk file parsing
-  parseKakao: (file, myName = '나', maxExamples = 50) => {
+  parseKakao: (file, myName = '나', maxExamples = 50, premiumAnalysis = false) => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('my_name', myName)
     formData.append('max_examples', maxExamples)
+    formData.append('premium_analysis', premiumAnalysis)
     return axios.post(`${API_BASE}/persona/parse-kakao`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
 
   // Create persona directly from KakaoTalk file
-  createFromKakao: (file, userId, name, myName = '나', maxExamples = 50, category = 'other', description = '', icon = '') => {
+  createFromKakao: (file, userId, name, myName = '나', maxExamples = 50, category = 'other', description = '', icon = '', premiumAnalysis = false) => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('user_id', userId)
@@ -37,6 +38,7 @@ export const personaAPI = {
     formData.append('my_name', myName)
     formData.append('max_examples', maxExamples)
     formData.append('category', category)
+    formData.append('premium_analysis', premiumAnalysis)
     if (description) formData.append('description', description)
     if (icon) formData.append('icon', icon)
     return axios.post(`${API_BASE}/persona/create-from-kakao`, formData, {
@@ -76,6 +78,26 @@ export const alibiAPI = {
     })
   },
   announceWithTone: (data) => api.post('/alibi/announce-with-tone', data),
+  // Photo-based alibi image generation
+  analyzePhoto: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return axios.post(`${API_BASE}/alibi/analyze-photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  generateFromPhoto: (file, situation, location = null, timeOfDay = null, activity = null, style = 'realistic') => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('situation', situation)
+    if (location) formData.append('location', location)
+    if (timeOfDay) formData.append('time_of_day', timeOfDay)
+    if (activity) formData.append('activity', activity)
+    formData.append('style', style)
+    return axios.post(`${API_BASE}/alibi/generate-from-photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 // Chat History API

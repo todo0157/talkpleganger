@@ -7,11 +7,19 @@ Endpoints for 1:N announcements, alibi image generation, and tone-based announce
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from typing import Optional
 
-from ..schemas.message import AlibiModeRequest, AlibiImageRequest, ChatToneAnalysis, ToneBasedAnnouncementRequest
+from ..schemas.message import (
+    AlibiModeRequest,
+    AlibiImageRequest,
+    ChatToneAnalysis,
+    ToneBasedAnnouncementRequest,
+    PhotoBasedAlibiRequest,
+    PhotoAnalysisResult,
+)
 from ..schemas.response import AlibiMessageResponse, AlibiImageResponse
 from ..services.gpt_service import GPTService
 from ..services.dalle_service import DalleService
 from ..services.kakao_parser import KakaoParser
+import base64
 
 router = APIRouter(prefix="/alibi", tags=["Alibi Mode"])
 
@@ -239,3 +247,140 @@ async def announce_with_tone(request: ToneBasedAnnouncementRequest):
     gpt_service = GPTService()
     result = await gpt_service.generate_tone_based_announcement(request)
     return result
+
+
+# ============================================================
+# Photo-Based Alibi Image Generation
+# ============================================================
+
+@router.post(
+    "/analyze-photo",
+    response_model=PhotoAnalysisResult,
+    summary="Analyze uploaded photo for alibi generation",
+    description="Analyze a photo to extract appearance and style for alibi image generation.",
+)
+async def analyze_photo(
+    file: UploadFile = File(...),
+):
+    """
+    Analyze an uploaded photo using GPT-4 Vision.
+
+    This endpoint:
+    - Extracts general appearance description (NOT face recognition)
+    - Describes clothing and style
+    - Suggests suitable alibi scenarios
+
+    Privacy note: No face identification is performed.
+    """
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"지원하지 않는 이미지 형식입니다. 지원 형식: JPEG, PNG, WebP, GIF",
+        )
+
+    try:
+        # Read and encode image
+        content = await file.read()
+
+        if len(content) > 20 * 1024 * 1024:  # 20MB limit
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="이미지 크기는 20MB 이하여야 합니다.",
+            )
+
+        image_base64 = base64.b64encode(content).decode("utf-8")
+
+        # Determine image type
+        image_type = file.content_type.split("/")[1]
+        if image_type == "jpeg":
+            image_type = "jpeg"
+
+        # Analyze with DALL-E service
+        dalle_service = DalleService()
+        analysis = await dalle_service.analyze_photo(image_base64, image_type)
+
+        return analysis
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"사진 분석 중 오류가 발생했습니다: {str(e)}",
+        )
+
+
+@router.post(
+    "/generate-from-photo",
+    response_model=AlibiImageResponse,
+    summary="Generate alibi image based on uploaded photo",
+    description="Generate a new alibi image that matches the style of an uploaded photo.",
+)
+async def generate_from_photo(
+    file: UploadFile = File(...),
+    situation: str = Form(...),
+    location: Optional[str] = Form(default=None),
+    time_of_day: Optional[str] = Form(default=None),
+    activity: Optional[str] = Form(default=None),
+    style: str = Form(default="realistic"),
+):
+    """
+    Generate an alibi image based on an uploaded reference photo.
+
+    This endpoint:
+    1. Analyzes the uploaded photo for appearance/style
+    2. Generates a new image with the same style in the specified situation
+    3. Returns the generated alibi image
+
+    The generated image will maintain privacy by showing the person
+    from behind, side profile, or with face naturally obscured.
+    """
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"지원하지 않는 이미지 형식입니다. 지원 형식: JPEG, PNG, WebP, GIF",
+        )
+
+    try:
+        # Read and encode image
+        content = await file.read()
+
+        if len(content) > 20 * 1024 * 1024:  # 20MB limit
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="이미지 크기는 20MB 이하여야 합니다.",
+            )
+
+        image_base64 = base64.b64encode(content).decode("utf-8")
+        image_type = file.content_type.split("/")[1]
+
+        dalle_service = DalleService()
+
+        # Step 1: Analyze the photo
+        analysis = await dalle_service.analyze_photo(image_base64, image_type)
+
+        # Step 2: Create request object
+        request = PhotoBasedAlibiRequest(
+            situation=situation,
+            location=location,
+            time_of_day=time_of_day,
+            activity=activity,
+            style=style,
+        )
+
+        # Step 3: Generate the alibi image
+        result = await dalle_service.generate_photo_based_alibi(analysis, request)
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"이미지 생성 중 오류가 발생했습니다: {str(e)}",
+        )

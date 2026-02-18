@@ -51,6 +51,9 @@ function PersonaPage() {
   const [isGroupChat, setIsGroupChat] = useState(false)
   const [participants, setParticipants] = useState({})
 
+  // Premium analysis state
+  const [premiumAnalysis, setPremiumAnalysis] = useState(false)
+
   useEffect(() => {
     loadPersonas()
   }, [])
@@ -117,13 +120,33 @@ function PersonaPage() {
     setParticipants({})
 
     try {
-      const res = await personaAPI.parseKakao(file, fileData.my_name)
+      const res = await personaAPI.parseKakao(file, fileData.my_name, 50, premiumAnalysis)
       setParsedPreview(res.data)
       setDetectedNames(res.data.detected_names || [])
       setIsGroupChat(res.data.is_group_chat || false)
       setParticipants(res.data.participants || {})
     } catch (err) {
       setError(err.response?.data?.detail || '파일 파싱에 실패했습니다')
+    }
+  }
+
+  // Re-parse when premium toggle changes
+  const handlePremiumToggle = async (newValue) => {
+    setPremiumAnalysis(newValue)
+
+    // Re-parse file if already selected
+    if (fileData.file) {
+      setError('')
+      setParsedPreview(null)
+      try {
+        const res = await personaAPI.parseKakao(fileData.file, fileData.my_name, 50, newValue)
+        setParsedPreview(res.data)
+        setDetectedNames(res.data.detected_names || [])
+        setIsGroupChat(res.data.is_group_chat || false)
+        setParticipants(res.data.participants || {})
+      } catch (err) {
+        setError(err.response?.data?.detail || '파일 파싱에 실패했습니다')
+      }
     }
   }
 
@@ -146,13 +169,15 @@ function PersonaPage() {
         50,
         fileData.category,
         fileData.description,
-        fileData.icon
+        fileData.icon,
+        premiumAnalysis
       )
       await loadPersonas()
       setFileData({ user_id: '', name: '', category: 'other', description: '', icon: '', my_name: '나', target_person: '', file: null })
       setParsedPreview(null)
       setIsGroupChat(false)
       setParticipants({})
+      setPremiumAnalysis(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err) {
       setError(err.response?.data?.detail || '페르소나 생성에 실패했습니다')
@@ -318,6 +343,69 @@ function PersonaPage() {
               </p>
             </div>
 
+            {/* Premium Analysis Toggle */}
+            <div className="form-group">
+              <div style={{
+                background: premiumAnalysis
+                  ? 'linear-gradient(135deg, rgba(254, 229, 0, 0.2) 0%, rgba(255, 215, 0, 0.1) 100%)'
+                  : 'rgba(0,0,0,0.2)',
+                border: premiumAnalysis ? '2px solid var(--primary)' : '2px solid rgba(255,255,255,0.1)',
+                borderRadius: '12px',
+                padding: '1rem',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+              }}
+              onClick={() => handlePremiumToggle(!premiumAnalysis)}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>{premiumAnalysis ? '👑' : '🔒'}</span>
+                    <div>
+                      <div style={{ fontWeight: '600', color: premiumAnalysis ? 'var(--primary)' : 'var(--text-light)' }}>
+                        프리미엄 분석
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        {premiumAnalysis
+                          ? '전체 메시지를 분석합니다 (제한 없음)'
+                          : '무료: 최대 50개 메시지만 분석'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    width: '50px',
+                    height: '28px',
+                    borderRadius: '14px',
+                    background: premiumAnalysis ? 'var(--primary)' : 'rgba(255,255,255,0.2)',
+                    position: 'relative',
+                    transition: 'background 0.3s ease',
+                  }}>
+                    <div style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      background: premiumAnalysis ? 'var(--secondary)' : 'var(--text-light)',
+                      position: 'absolute',
+                      top: '3px',
+                      left: premiumAnalysis ? '25px' : '3px',
+                      transition: 'left 0.3s ease',
+                    }} />
+                  </div>
+                </div>
+                {premiumAnalysis && (
+                  <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.5rem 0.75rem',
+                    background: 'rgba(254, 229, 0, 0.15)',
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    color: 'var(--primary)',
+                  }}>
+                    💡 더 많은 대화 데이터로 정확한 말투 분석이 가능합니다
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="form-group">
               <label className="form-label">카카오톡 대화 파일 (.txt)</label>
               <input
@@ -342,9 +430,31 @@ function PersonaPage() {
               <div className="response-box" style={{ marginBottom: '1rem' }}>
                 <div className="response-header">
                   <span className="response-label">파싱 결과 미리보기</span>
+                  {parsedPreview.is_premium_analysis && (
+                    <span className="confidence-badge" style={{
+                      marginLeft: '0.5rem',
+                      background: 'linear-gradient(135deg, rgba(254, 229, 0, 0.3) 0%, rgba(255, 215, 0, 0.2) 100%)',
+                      color: 'var(--primary)',
+                      border: '1px solid var(--primary)',
+                      fontWeight: '600',
+                    }}>
+                      👑 프리미엄
+                    </span>
+                  )}
                   <span className="confidence-badge confidence-high">
-                    {parsedPreview.total_messages}개 메시지
+                    {parsedPreview.messages_analyzed || parsedPreview.total_messages}개 분석
                   </span>
+                  {!parsedPreview.is_premium_analysis && parsedPreview.total_messages_in_file > parsedPreview.messages_analyzed && (
+                    <span className="confidence-badge" style={{
+                      marginLeft: '0.5rem',
+                      background: 'rgba(255, 165, 0, 0.15)',
+                      color: '#ffa500',
+                      border: '1px solid rgba(255, 165, 0, 0.3)',
+                      fontSize: '0.75rem',
+                    }}>
+                      전체 {parsedPreview.total_messages_in_file}개 중
+                    </span>
+                  )}
                   {parsedPreview.encoding_used && (
                     <span className="confidence-badge" style={{
                       marginLeft: '0.5rem',
@@ -361,6 +471,35 @@ function PersonaPage() {
                     </span>
                   )}
                 </div>
+
+                {/* Premium upgrade prompt */}
+                {!parsedPreview.is_premium_analysis && parsedPreview.total_messages_in_file > parsedPreview.messages_analyzed && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(254, 229, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)',
+                    border: '1px dashed var(--primary)',
+                    borderRadius: '8px',
+                    padding: '0.75rem',
+                    marginTop: '0.75rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}>
+                    <div style={{ fontSize: '0.85rem' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: '600' }}>👑 프리미엄 분석</span>
+                      <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                        전체 {parsedPreview.total_messages_in_file}개 메시지를 모두 분석하여 더 정확한 말투 학습
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                      onClick={() => handlePremiumToggle(true)}
+                    >
+                      프리미엄 켜기
+                    </button>
+                  </div>
+                )}
 
                 {/* Group Chat Participants */}
                 {isGroupChat && Object.keys(participants).length > 0 && (
@@ -430,8 +569,11 @@ function PersonaPage() {
               type="submit"
               className="btn btn-primary"
               disabled={creating || !parsedPreview}
+              style={premiumAnalysis ? {
+                background: 'linear-gradient(135deg, var(--primary) 0%, #ffd700 100%)',
+              } : {}}
             >
-              {creating ? '생성 중...' : '페르소나 생성'}
+              {creating ? '생성 중...' : premiumAnalysis ? '👑 프리미엄 페르소나 생성' : '페르소나 생성'}
             </button>
           </form>
         )}

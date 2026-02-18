@@ -235,6 +235,70 @@ class ChatToneAnalysis(BaseModel):
 - 타이밍 추천 ON/OFF 토글
 - 맥락 윈도우 크기 슬라이더
 
+### 5. 프리미엄 전체 메시지 분석 (Premium Full Analysis)
+무료 버전은 최대 50개 메시지만 분석하지만, 프리미엄 분석은 전체 메시지를 분석합니다.
+
+**무료 vs 프리미엄**:
+| 기능 | 무료 | 프리미엄 |
+|------|------|----------|
+| 메시지 분석 | 최대 50개 | 제한 없음 |
+| 말투 정확도 | 기본 | 향상 |
+| 분석 속도 | 빠름 | 데이터 양에 비례 |
+
+**API 파라미터**:
+```python
+# /persona/parse-kakao
+premium_analysis: bool = False  # True로 설정 시 전체 분석
+
+# /persona/create-from-kakao
+premium_analysis: bool = False  # True로 설정 시 전체 분석
+```
+
+**응답 필드**:
+```python
+class ParsedChatResponse:
+    is_premium_analysis: bool      # 프리미엄 분석 여부
+    total_messages_in_file: int    # 파일 내 전체 메시지 수
+    messages_analyzed: int         # 실제 분석된 메시지 수
+```
+
+**UI 기능**:
+- 프리미엄 분석 토글 스위치 (👑 아이콘)
+- 무료 사용 시 "전체 N개 중" 표시
+- 프리미엄 업그레이드 프롬프트
+- 프리미엄 활성화 시 골드 색상 버튼
+
+### 6. 사진 기반 알리바이 이미지 (Photo-Based Alibi Image)
+실제 사진을 분석하여 동일한 스타일의 알리바이 이미지를 생성합니다.
+
+**워크플로우**:
+1. 사진 업로드 → GPT-4 Vision으로 외형/스타일 분석
+2. 알리바이 상황 선택 (추천 상황 제공)
+3. DALL-E 3로 동일 스타일의 알리바이 이미지 생성
+
+```python
+class PhotoAnalysisResult(BaseModel):
+    person_description: str     # 인물의 일반적 외형 (얼굴 인식 X)
+    clothing_description: str   # 의상 및 스타일
+    suggested_scenarios: list   # 추천 알리바이 상황
+
+class PhotoBasedAlibiRequest(BaseModel):
+    situation: str              # 알리바이 상황 설명
+    location: Optional[str]     # 장소 (스타벅스, 사무실 등)
+    time_of_day: Optional[str]  # 시간대 (morning/afternoon/evening/night)
+    activity: Optional[str]     # 활동 (커피 마시며 독서 등)
+    style: str = "realistic"    # 이미지 스타일
+```
+
+**개인정보 보호**:
+- 얼굴 인식/신원 확인 없음
+- 생성 이미지는 뒷모습/측면/자연스러운 얼굴 가림 처리
+- 일반적인 외형 특징만 분석 (체형, 헤어스타일, 의상)
+
+**API 엔드포인트**:
+- `POST /alibi/analyze-photo`: 사진 분석
+- `POST /alibi/generate-from-photo`: 사진 기반 알리바이 이미지 생성
+
 ---
 
 ## 감정 분석 기능
@@ -303,6 +367,8 @@ OPENAI_API_KEY=sk-...
 | `POST /alibi/analyze-tone` | 채팅 파일 톤 분석 (v2.1) |
 | `POST /alibi/announce-with-tone` | 톤 맞춤 공지 생성 (v2.1) |
 | `POST /alibi/image` | 알리바이 이미지 생성 |
+| `POST /alibi/analyze-photo` | 사진 분석 (v2.1) |
+| `POST /alibi/generate-from-photo` | 사진 기반 알리바이 이미지 생성 (v2.1) |
 | `GET /history/{user_id}` | 대화 기록 조회 |
 | `GET /history/{user_id}/stats` | 대화 통계 |
 | `DELETE /history/{user_id}` | 대화 기록 삭제 |

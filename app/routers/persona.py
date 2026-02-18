@@ -27,6 +27,10 @@ class ParsedChatResponse(BaseModel):
     participants: dict[str, int] = {}
     encoding_used: Optional[str] = None
     error_details: Optional[str] = None
+    # Premium feature info
+    is_premium_analysis: bool = False
+    total_messages_in_file: int = 0
+    messages_analyzed: int = 0
 
 
 class ChatStatsResponse(BaseModel):
@@ -41,6 +45,11 @@ class ChatStatsResponse(BaseModel):
 # KakaoTalk File Upload Endpoints (MUST be before /{user_id})
 # ============================================================
 
+# Free tier limits
+FREE_TIER_MAX_EXAMPLES = 50
+PREMIUM_MAX_EXAMPLES = 999999  # Virtually unlimited
+
+
 @router.post(
     "/parse-kakao",
     response_model=ParsedChatResponse,
@@ -50,6 +59,7 @@ async def parse_kakao_chat(
     file: UploadFile = File(...),
     my_name: str = Form(default="나"),
     max_examples: int = Form(default=50),
+    premium_analysis: bool = Form(default=False),
 ):
     """
     Parse a KakaoTalk exported chat txt file.
@@ -60,6 +70,9 @@ async def parse_kakao_chat(
     3. Select "Save as text"
 
     Supports multiple encodings: UTF-8, CP949, EUC-KR (auto-detected)
+
+    **Premium Feature**: Set `premium_analysis=true` for full message analysis (no limit).
+    Free tier is limited to 50 messages.
     """
     if not file.filename.endswith('.txt'):
         raise HTTPException(
@@ -76,11 +89,14 @@ async def parse_kakao_chat(
                 detail="파일이 비어있습니다.",
             )
 
+        # Determine max examples based on premium status
+        effective_max = PREMIUM_MAX_EXAMPLES if premium_analysis else min(max_examples, FREE_TIER_MAX_EXAMPLES)
+
         # Use improved parsing with automatic encoding detection
         examples, parse_result = KakaoParser.parse_from_bytes(
             content=content,
             my_name=my_name,
-            max_examples=max_examples,
+            max_examples=effective_max,
         )
 
         if not parse_result.success:
@@ -92,6 +108,7 @@ async def parse_kakao_chat(
         # Get chat statistics using the decoded content
         stats = KakaoParser.get_chat_stats(parse_result.content)
         detected_names = list(stats["participants"].keys())
+        total_messages_in_file = stats["total_messages"]
 
         if len(examples) == 0:
             raise HTTPException(
@@ -99,15 +116,27 @@ async def parse_kakao_chat(
                 detail=f"메시지를 찾을 수 없습니다. '{my_name}'이 대화방에서 사용하는 이름이 맞는지 확인해주세요. 감지된 참여자: {', '.join(detected_names[:5])}",
             )
 
+        # Build message based on premium status
+        if premium_analysis:
+            message = f"[프리미엄] {stats['participant_count']}명의 참여자로부터 전체 {len(examples)}개 메시지를 분석했습니다 ({parse_result.encoding_used} 인코딩)"
+        else:
+            if total_messages_in_file > len(examples):
+                message = f"{stats['participant_count']}명의 참여자로부터 {len(examples)}개 메시지를 파싱했습니다 (전체 {total_messages_in_file}개 중, 프리미엄으로 전체 분석 가능)"
+            else:
+                message = f"{stats['participant_count']}명의 참여자로부터 {len(examples)}개 메시지를 파싱했습니다 ({parse_result.encoding_used} 인코딩)"
+
         return ParsedChatResponse(
             success=True,
-            message=f"{stats['participant_count']}명의 참여자로부터 {len(examples)}개 메시지를 파싱했습니다 ({parse_result.encoding_used} 인코딩)",
+            message=message,
             detected_names=detected_names,
             chat_examples=examples,
             total_messages=len(examples),
             is_group_chat=stats["is_group_chat"],
             participants=stats["participants"],
             encoding_used=parse_result.encoding_used,
+            is_premium_analysis=premium_analysis,
+            total_messages_in_file=total_messages_in_file,
+            messages_analyzed=len(examples),
         )
 
     except HTTPException:
@@ -134,11 +163,15 @@ async def create_persona_from_kakao(
     category: str = Form(default="other"),
     description: Optional[str] = Form(default=None),
     icon: Optional[str] = Form(default=None),
+    premium_analysis: bool = Form(default=False),
 ):
     """
     Create a persona directly from a KakaoTalk exported chat file.
 
     Supports multiple encodings: UTF-8, CP949, EUC-KR (auto-detected)
+
+    **Premium Feature**: Set `premium_analysis=true` for full message analysis.
+    Free tier is limited to 50 messages for persona creation.
     """
     if not file.filename.endswith('.txt'):
         raise HTTPException(
@@ -155,11 +188,14 @@ async def create_persona_from_kakao(
                 detail="파일이 비어있습니다.",
             )
 
+        # Determine max examples based on premium status
+        effective_max = PREMIUM_MAX_EXAMPLES if premium_analysis else min(max_examples, FREE_TIER_MAX_EXAMPLES)
+
         # Use improved parsing with automatic encoding detection
         examples, parse_result = KakaoParser.parse_from_bytes(
             content=content,
             my_name=my_name,
-            max_examples=max_examples,
+            max_examples=effective_max,
         )
 
         if not parse_result.success:
@@ -194,11 +230,17 @@ async def create_persona_from_kakao(
         except ValueError:
             persona_category = PersonaCategory.OTHER
 
+        # Add premium indicator to description if premium analysis was used
+        final_description = description
+        if premium_analysis:
+            premium_note = f"[프리미엄 분석: {len(examples)}개 메시지]"
+            final_description = f"{premium_note} {description}" if description else premium_note
+
         persona_data = PersonaCreate(
             user_id=user_id,
             name=name,
             category=persona_category,
-            description=description,
+            description=final_description,
             icon=icon,
             chat_examples=examples,
         )

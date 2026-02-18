@@ -28,6 +28,20 @@ function AlibiMode() {
   const [toneGenerating, setToneGenerating] = useState(false)
   const toneFileRef = useRef(null)
 
+  // Photo-based alibi state
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
+  const [photoAnalysis, setPhotoAnalysis] = useState(null)
+  const [photoSituation, setPhotoSituation] = useState('')
+  const [photoLocation, setPhotoLocation] = useState('')
+  const [photoTimeOfDay, setPhotoTimeOfDay] = useState('')
+  const [photoActivity, setPhotoActivity] = useState('')
+  const [photoStyle, setPhotoStyle] = useState('realistic')
+  const [photoResponse, setPhotoResponse] = useState(null)
+  const [photoAnalyzing, setPhotoAnalyzing] = useState(false)
+  const [photoGenerating, setPhotoGenerating] = useState(false)
+  const photoFileRef = useRef(null)
+
   const [error, setError] = useState('')
 
   const groups = [
@@ -155,6 +169,79 @@ function AlibiMode() {
     if (toneFileRef.current) toneFileRef.current.value = ''
   }
 
+  // Photo-based alibi handlers
+  const handlePhotoSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Create preview
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result)
+    }
+    reader.readAsDataURL(file)
+
+    setPhotoFile(file)
+    setPhotoAnalysis(null)
+    setPhotoResponse(null)
+    setError('')
+
+    // Auto-analyze the photo
+    try {
+      setPhotoAnalyzing(true)
+      const res = await alibiAPI.analyzePhoto(file)
+      setPhotoAnalysis(res.data)
+    } catch (err) {
+      setError(err.response?.data?.detail || '사진 분석에 실패했습니다')
+    } finally {
+      setPhotoAnalyzing(false)
+    }
+  }
+
+  const handlePhotoGenerate = async (e) => {
+    e.preventDefault()
+    setError('')
+    setPhotoResponse(null)
+
+    if (!photoFile) {
+      setError('먼저 사진을 업로드해주세요')
+      return
+    }
+
+    try {
+      setPhotoGenerating(true)
+      const res = await alibiAPI.generateFromPhoto(
+        photoFile,
+        photoSituation,
+        photoLocation || null,
+        photoTimeOfDay || null,
+        photoActivity || null,
+        photoStyle
+      )
+      setPhotoResponse(res.data)
+    } catch (err) {
+      setError(err.response?.data?.detail || '이미지 생성에 실패했습니다')
+    } finally {
+      setPhotoGenerating(false)
+    }
+  }
+
+  const resetPhotoAnalysis = () => {
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setPhotoAnalysis(null)
+    setPhotoResponse(null)
+    setPhotoSituation('')
+    setPhotoLocation('')
+    setPhotoTimeOfDay('')
+    setPhotoActivity('')
+    if (photoFileRef.current) photoFileRef.current.value = ''
+  }
+
+  const selectSuggestedScenario = (scenario) => {
+    setPhotoSituation(scenario)
+  }
+
   return (
     <div className="page">
       <h1 className="page-title">🎭 Alibi Mode</h1>
@@ -179,6 +266,12 @@ function AlibiMode() {
           onClick={() => setActiveTab('image')}
         >
           🖼️ 알리바이 이미지
+        </button>
+        <button
+          className={`btn ${activeTab === 'photo' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('photo')}
+        >
+          📷 사진 기반 이미지
         </button>
       </div>
 
@@ -608,6 +701,262 @@ function AlibiMode() {
               >
                 🔗 이미지 새 탭에서 열기
               </a>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Photo-Based Alibi Tab */}
+      {activeTab === 'photo' && (
+        <>
+          <div className="card">
+            <h3 className="card-title">📷 사진 기반 알리바이 이미지</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              실제 사진을 분석하여 같은 스타일의 알리바이 이미지를 생성해요
+            </p>
+
+            {/* Photo Upload Section */}
+            <div className="form-group">
+              <label className="form-label">1. 참고 사진 업로드</label>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                본인의 스타일을 분석할 사진을 업로드하세요 (얼굴 인식은 하지 않습니다)
+              </p>
+
+              <input
+                ref={photoFileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handlePhotoSelect}
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  background: 'rgba(0,0,0,0.3)',
+                  border: '2px dashed rgba(255,255,255,0.2)',
+                  borderRadius: '8px',
+                  color: 'var(--text-light)',
+                  cursor: 'pointer',
+                }}
+              />
+            </div>
+
+            {/* Photo Preview */}
+            {photoPreview && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>업로드된 사진</span>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={resetPhotoAnalysis}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                  >
+                    다시 선택
+                  </button>
+                </div>
+                <img
+                  src={photoPreview}
+                  alt="Uploaded preview"
+                  style={{
+                    maxWidth: '200px',
+                    maxHeight: '200px',
+                    borderRadius: '8px',
+                    objectFit: 'cover',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Analysis Loading */}
+            {photoAnalyzing && (
+              <div className="loading" style={{ padding: '1.5rem' }}>
+                <div className="spinner"></div>
+                <span>사진을 분석하고 있어요...</span>
+              </div>
+            )}
+
+            {/* Analysis Result */}
+            {photoAnalysis && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)',
+                borderRadius: '12px',
+                padding: '1rem',
+                marginBottom: '1.25rem',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+              }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', color: '#22c55e' }}>✅ 사진 분석 완료</h4>
+
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>외형 분석</span>
+                  <div style={{ fontSize: '0.95rem', marginTop: '0.25rem' }}>{photoAnalysis.person_description}</div>
+                </div>
+
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>의상/스타일</span>
+                  <div style={{ fontSize: '0.95rem', marginTop: '0.25rem' }}>{photoAnalysis.clothing_description}</div>
+                </div>
+
+                {photoAnalysis.suggested_scenarios?.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>추천 알리바이 상황</span>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                      {photoAnalysis.suggested_scenarios.map((scenario, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => selectSuggestedScenario(scenario)}
+                          style={{
+                            background: photoSituation === scenario ? 'rgba(254, 229, 0, 0.3)' : 'rgba(255,255,255,0.1)',
+                            padding: '0.35rem 0.7rem',
+                            borderRadius: '8px',
+                            fontSize: '0.85rem',
+                            border: photoSituation === scenario ? '1px solid var(--primary)' : '1px solid transparent',
+                            cursor: 'pointer',
+                            color: 'var(--text-light)',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          {scenario}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Generation Form (only show if analysis is done) */}
+            {photoAnalysis && (
+              <form onSubmit={handlePhotoGenerate}>
+                <div className="form-group">
+                  <label className="form-label">2. 알리바이 상황 설명</label>
+                  <textarea
+                    className="form-textarea"
+                    placeholder="예: 카페에서 노트북으로 작업 중"
+                    value={photoSituation}
+                    onChange={(e) => setPhotoSituation(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">장소 (선택)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="예: 스타벅스, 사무실"
+                      value={photoLocation}
+                      onChange={(e) => setPhotoLocation(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">시간대 (선택)</label>
+                    <select
+                      className="form-select"
+                      value={photoTimeOfDay}
+                      onChange={(e) => setPhotoTimeOfDay(e.target.value)}
+                    >
+                      <option value="">선택 안 함</option>
+                      <option value="morning">아침 (morning)</option>
+                      <option value="afternoon">오후 (afternoon)</option>
+                      <option value="evening">저녁 (evening)</option>
+                      <option value="night">밤 (night)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">활동 (선택)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="예: 커피 마시며 독서"
+                      value={photoActivity}
+                      onChange={(e) => setPhotoActivity(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">이미지 스타일</label>
+                    <select
+                      className="form-select"
+                      value={photoStyle}
+                      onChange={(e) => setPhotoStyle(e.target.value)}
+                    >
+                      <option value="realistic">사실적 (Realistic)</option>
+                      <option value="artistic">예술적 (Artistic)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {error && (
+                  <p style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</p>
+                )}
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={photoGenerating}
+                >
+                  {photoGenerating ? '생성 중...' : '알리바이 이미지 생성'}
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* Generation Loading */}
+          {photoGenerating && (
+            <div className="card">
+              <div className="loading">
+                <div className="spinner"></div>
+                <span>스타일에 맞는 알리바이 이미지를 생성하고 있어요... (약 15-30초)</span>
+              </div>
+            </div>
+          )}
+
+          {/* Generated Result */}
+          {photoResponse && (
+            <div className="card">
+              <h3 className="card-title">✅ 생성된 알리바이 이미지</h3>
+
+              <img
+                src={photoResponse.image_url}
+                alt="Generated alibi"
+                className="alibi-image"
+              />
+
+              <div style={{ marginTop: '1rem' }}>
+                <strong>상황:</strong> {photoResponse.situation}
+              </div>
+
+              {photoResponse.usage_tips?.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <strong>사용 팁:</strong>
+                  <ul className="tips-list">
+                    {photoResponse.usage_tips.map((tip, i) => (
+                      <li key={i}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                <a
+                  href={photoResponse.image_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary"
+                >
+                  🔗 이미지 새 탭에서 열기
+                </a>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setPhotoResponse(null)}
+                >
+                  🔄 다시 생성
+                </button>
+              </div>
             </div>
           )}
         </>

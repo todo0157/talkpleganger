@@ -160,3 +160,37 @@ class ToneBasedAnnouncementRequest(BaseModel):
     group_name: str = Field(
         default="", description="Name of the group/chat room"
     )
+
+
+class PhotoBasedAlibiRequest(BaseModel):
+    """Request for photo-based alibi image generation."""
+
+    situation: str = Field(
+        ..., description="The alibi situation to depict (e.g., 'working at a cafe')"
+    )
+    location: Optional[str] = Field(
+        default=None, description="Specific location (e.g., 'Starbucks', 'office')"
+    )
+    time_of_day: Optional[str] = Field(
+        default=None, description="Time of day (morning/afternoon/evening/night)"
+    )
+    activity: Optional[str] = Field(
+        default=None, description="What the person is doing"
+    )
+    style: str = Field(
+        default="realistic", description="Image style: realistic/artistic"
+    )
+
+
+class PhotoAnalysisResult(BaseModel):
+    """Result of analyzing an uploaded photo."""
+
+    person_description: str = Field(
+        ..., description="Description of the person's appearance"
+    )
+    clothing_description: str = Field(
+        ..., description="Description of clothing/style"
+    )
+    suggested_scenarios: list[str] = Field(
+        default_factory=list, description="Suggested alibi scenarios"
+    )
