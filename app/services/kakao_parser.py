@@ -160,8 +160,15 @@ class KakaoParser:
         r'^\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{1,2}:\d{2},\s*(.+?)\s*:\s*(.+)$'
     )
 
+    # Mobile KakaoTalk export pattern: "2025년 4월 19일 오전 12:41, 권창한 : 메시지"
+    # Format: YYYY년 M월 D일 오전/오후 H:MM, 이름 : 메시지
+    MESSAGE_PATTERN_MOBILE = re.compile(
+        r'^\d{4}년\s*\d{1,2}월\s*\d{1,2}일\s+(오전|오후)\s*(\d{1,2}):(\d{2}),\s*(.+?)\s*:\s*(.+)$'
+    )
+
     # Pattern for date separators: "--- 2024년 1월 15일 ---" or "2024년 1월 15일 월요일"
-    DATE_PATTERN = re.compile(r'^-*\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일.*-*$')
+    # Must NOT contain comma to avoid matching message lines like "2025년 4월 19일 오전 12:41, 이름 : 메시지"
+    DATE_PATTERN = re.compile(r'^-*\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일[^,]*$')
 
     # System messages to ignore
     SYSTEM_KEYWORDS = [
@@ -293,6 +300,13 @@ class KakaoParser:
                     sender_group = 1
                     message_group = 2
 
+            if not match:
+                # Try Mobile format: "2025년 4월 19일 오전 12:41, 권창한 : 메시지"
+                match = cls.MESSAGE_PATTERN_MOBILE.match(line)
+                if match:
+                    sender_group = 4
+                    message_group = 5
+
             if match:
                 # Save previous message if exists
                 if current_sender is not None and current_message:
@@ -404,6 +418,12 @@ class KakaoParser:
                 if match:
                     sender_group = 1  # iOS pattern also uses group 1 for sender
 
+            if not match:
+                # Try Mobile format
+                match = cls.MESSAGE_PATTERN_MOBILE.match(line_stripped)
+                if match:
+                    sender_group = 4  # Mobile pattern uses group 4 for sender
+
             if match:
                 sender = match.group(sender_group).strip()
                 if sender not in participants:
@@ -469,6 +489,13 @@ class KakaoParser:
                 if match:
                     sender_group = 1
                     message_group = 2
+
+            if not match:
+                # Try Mobile format
+                match = cls.MESSAGE_PATTERN_MOBILE.match(line)
+                if match:
+                    sender_group = 4
+                    message_group = 5
 
             if match:
                 if current_sender is not None and current_message:
